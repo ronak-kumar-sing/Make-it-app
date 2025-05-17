@@ -1,50 +1,128 @@
-# Welcome to your Expo app 👋
+# Make-it: Productivity & Study Companion 📚✅
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## Overview
 
-## Get started
+Make-it is a comprehensive productivity and study companion designed to help students and professionals maximize their efficiency and track their academic progress. Built with React Native and Expo, this cross-platform mobile application offers a suite of powerful features to manage tasks, monitor study habits, and improve learning outcomes.
 
-1. Install dependencies
+![Make-it App](https://github.com/ronak-kumar-sing/Make-it/raw/main/assets/images/adaptive-icon.png)
 
+## ✨ Features
+
+### 📋 Task Management
+- Create, organize, and prioritize tasks
+- Set deadlines and reminders
+- Track completion status
+- Categorize tasks by subject or project
+
+### ⏱️ Study Timer
+- Pomodoro technique implementation
+- Customizable work/break intervals
+- Session tracking and statistics
+- Focus mode to minimize distractions
+
+### 📊 Analytics Dashboard
+- Visualize study patterns and productivity trends
+- Track daily, weekly, and monthly progress
+- Identify peak productivity times
+- Monitor completion rates and efficiency
+
+### 🔥 Streak System
+- Build and maintain daily study habits
+- Calendar view of your consistency
+- Motivational notifications and achievements
+- Visual progress indicators
+
+### 📝 Exam Management
+- Schedule and prepare for upcoming exams
+- Track study progress for specific subjects
+- Set study goals tied to exam dates
+- Resource organization for test preparation
+
+### 🏆 Achievements System
+- Unlock rewards for consistent study habits
+- Badge collection for completed milestones
+- Progress tracking toward long-term goals
+- Motivational feedback to encourage persistence
+
+### 📚 Resource Management
+- Organize study materials and references
+- Import and access documents within the app
+- Share resources with study groups
+- Tag and categorize learning materials
+
+## 🚀 Technology Stack
+
+- **Framework**: React Native with Expo
+- **Navigation**: React Navigation with Expo Router
+- **State Management**: Context API
+- **Data Persistence**: Async Storage
+- **UI Components**: Custom components with Reanimated for animations
+- **Charts & Visualization**: React Native Chart Kit
+- **Date Management**: date-fns
+
+## 📱 Supported Platforms
+
+- iOS
+- Android
+- Web (responsive design)
+
+## 🛠️ Getting Started
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/ronak-kumar-sing/Make-it.git
+   cd Make-it
+   ```
+
+2. Install dependencies:
    ```bash
    npm install
    ```
 
-2. Start the app
-
+3. Start the development server:
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+4. Open the app in your preferred environment:
+   - iOS simulator
+   - Android emulator
+   - Scan QR code with Expo Go on your physical device
+   - Web browser
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 📖 Documentation
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+For more detailed information about the architecture, components, and API integrations, please refer to our [Documentation](https://github.com/ronak-kumar-sing/Make-it/wiki).
 
-## Get a fresh project
+## 🔄 Roadmap(Upcoming feature)
 
-When you're ready, run:
+- Cloud sync across multiple devices
+- Study group collaboration features
+- AI-powered study recommendations
+- Integration with calendar applications
+- Dark/light theme customization
+- Offline mode enhancements
 
-```bash
-npm run reset-project
-```
+## 👥 Contributing
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Learn more
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-To learn more about developing your project with Expo, look at the following resources:
+## 📄 License
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Join the community
+## 🙏 Acknowledgments
 
-Join our community of developers creating universal apps.
+- [Expo](https://expo.dev) for their excellent development platform
+- All open source contributors whose libraries make this project possible
+- Our beta testers for their valuable feedback and suggestions
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 📧 Contact
+
+For questions, feedback, or support, please open an issue or contact the maintainers at [example@email.com](mailto:example@email.com).
