@@ -4,7 +4,7 @@
 
 Make-it is a comprehensive productivity and study companion designed to help students and professionals maximize their efficiency and track their academic progress. Built with React Native and Expo, this cross-platform mobile application offers a suite of powerful features to manage tasks, monitor study habits, and improve learning outcomes.
 
-![Make-it App](https://github.com/ronak-kumar-sing/Make-it/raw/main/assets/images/adaptive-icon.png)
+![Make-it App](https://github.com/ronak-kumar-sing/Make-it-app/raw/main/assets/images/adaptive-icon.png)
 
 ## ✨ Features
 
@@ -70,7 +70,7 @@ Make-it is a comprehensive productivity and study companion designed to help stu
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/ronak-kumar-sing/Make-it.git
+   git clone https://github.com/ronak-kumar-sing/Make-it-app.git
    cd Make-it
    ```
 
@@ -92,7 +92,7 @@ Make-it is a comprehensive productivity and study companion designed to help stu
 
 ## 📖 Documentation
 
-For more detailed information about the architecture, components, and API integrations, please refer to our [Documentation](https://github.com/ronak-kumar-sing/Make-it/wiki).
+For more detailed information about the architecture, components, and API integrations, please refer to our [Documentation](https://github.com/ronak-kumar-sing/Make-it-app/wiki).
 
 ## 🔄 Roadmap(Upcoming feature)
 
