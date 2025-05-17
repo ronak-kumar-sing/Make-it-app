@@ -5,17 +5,20 @@ import {
   Dimensions,
   Image,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 const OnboardingScreen = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const navigation = useNavigation();
+  const { theme } = useTheme();
 
   const onboardingData = [
     {
@@ -64,7 +67,8 @@ const OnboardingScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar backgroundColor={theme.background} barStyle={theme.statusBar} />
       <ScrollView
         horizontal
         pagingEnabled
@@ -77,13 +81,13 @@ const OnboardingScreen = () => {
         ref={(ref) => (this.scrollRef = ref)}
       >
         {onboardingData.map((page, index) => (
-          <View key={index} style={styles.page}>
-            <View style={styles.iconContainer}>
-              <Ionicons name={page.icon} size={80} color="#6C63FF" />
+          <View key={index} style={[styles.page, { backgroundColor: theme.background }]}>
+            <View style={[styles.iconContainer, { backgroundColor: theme.primaryLight }]}>
+              <Ionicons name={page.icon} size={80} color={theme.primary} />
             </View>
             <Image source={page.image} style={styles.image} />
-            <Text style={styles.title}>{page.title}</Text>
-            <Text style={styles.description}>{page.description}</Text>
+            <Text style={[styles.title, { color: theme.text }]}>{page.title}</Text>
+            <Text style={[styles.description, { color: theme.textSecondary }]}>{page.description}</Text>
           </View>
         ))}
       </ScrollView>
@@ -95,7 +99,8 @@ const OnboardingScreen = () => {
               key={index}
               style={[
                 styles.indicator,
-                index === currentPage && styles.activeIndicator
+                { backgroundColor: theme.isDark ? theme.border : '#DDDDDD' },
+                index === currentPage && [styles.activeIndicator, { backgroundColor: theme.primary }]
               ]}
             />
           ))}
@@ -106,11 +111,11 @@ const OnboardingScreen = () => {
             style={styles.skipButton}
             onPress={handleSkip}
           >
-            <Text style={styles.skipButtonText}>Skip</Text>
+            <Text style={[styles.skipButtonText, { color: theme.textSecondary }]}>Skip</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.nextButton}
+            style={[styles.nextButton, { backgroundColor: theme.primary }]}
             onPress={handleNext}
           >
             <Text style={styles.nextButtonText}>
@@ -126,7 +131,6 @@ const OnboardingScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   page: {
     width,
@@ -139,7 +143,6 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#F0EEFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 30,
@@ -153,13 +156,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     textAlign: 'center',
     marginBottom: 16,
   },
   description: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     paddingHorizontal: 32,
   },
@@ -176,11 +177,9 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#DDDDDD',
     marginHorizontal: 4,
   },
   activeIndicator: {
-    backgroundColor: '#6C63FF',
     width: 20,
   },
   buttonContainer: {
@@ -192,11 +191,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   skipButtonText: {
-    color: '#666',
     fontSize: 16,
   },
   nextButton: {
-    backgroundColor: '#6C63FF',
     paddingVertical: 12,
     paddingHorizontal: 32,
     borderRadius: 24,

@@ -4,6 +4,10 @@
 
 Make-it is a comprehensive productivity and study companion designed to help students and professionals maximize their efficiency and track their academic progress. Built with React Native and Expo, this cross-platform mobile application offers a suite of powerful features to manage tasks, monitor study habits, and improve learning outcomes.
 
+🚀 **NEW: AI-Powered Study Resources with Google Gemini 2.0** - Generate custom study materials, notes, and flashcards with cutting-edge AI technology!
+
+🚀 **NEW: AI-Powered Study Resources with Google Gemini 2.0** - Generate custom study materials, notes, and flashcards with cutting-edge AI technology!
+
 ![Make-it App](https://github.com/ronak-kumar-sing/Make-it-app/raw/main/assets/images/adaptive-icon.png)
 
 ## ✨ Features
@@ -29,6 +33,12 @@ Make-it is a comprehensive productivity and study companion designed to help stu
 ### 🔥 Streak System
 - Build and maintain daily study habits
 - Calendar view of your consistency
+
+### 🧠 AI-Powered Study Resources
+- Generate study materials with Google Gemini API 2.0
+- AI-created notes and flashcards
+- Topic-specific visual aids and explanations
+- Personalized learning content
 - Motivational notifications and achievements
 - Visual progress indicators
 

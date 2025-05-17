@@ -22,14 +22,27 @@ import TasksScreen from './screens/TasksScreen';
 import TimerScreen from './screens/TimerScreen';
 
 // Context
-import { AppProvider } from './context';
+import { AppProvider } from './context/AppContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function TasksStack() {
+  const { theme } = useTheme();
+
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: theme.card,
+        },
+        headerTintColor: theme.text,
+        contentStyle: {
+          backgroundColor: theme.background,
+        },
+      }}
+    >
       <Stack.Screen
         name="TasksList"
         component={TasksScreen}
@@ -50,8 +63,20 @@ function TasksStack() {
 }
 
 function DashboardStack() {
+  const { theme } = useTheme();
+
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: theme.card,
+        },
+        headerTintColor: theme.text,
+        contentStyle: {
+          backgroundColor: theme.background,
+        },
+      }}
+    >
       <Stack.Screen
         name="DashboardMain"
         component={DashboardScreen}
@@ -82,6 +107,8 @@ function DashboardStack() {
 }
 
 function MainTabs() {
+  const { theme } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -102,8 +129,12 @@ function MainTabs() {
 
           return <Ionicons name={iconName as any} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#6C63FF',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.textSecondary,
+        tabBarStyle: {
+          backgroundColor: theme.card,
+          borderTopColor: theme.border,
+        },
         headerShown: false,
       })}
     >
@@ -136,27 +167,34 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AppProvider>
-          <StatusBar style="auto" />
-          {isFirstLaunch ? (
-            <Stack.Navigator>
-              <Stack.Screen
-                name="Onboarding"
-                component={OnboardingScreen}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="Main"
-                component={MainTabs}
-                options={{ headerShown: false }}
-              />
-            </Stack.Navigator>
-          ) : (
-            <MainTabs />
-          )}
-        </AppProvider>
-      </SafeAreaProvider>
+      <ThemeProvider>
+        <AppThemeWrapper>
+          <SafeAreaProvider>
+            <AppProvider>
+              <Stack.Navigator screenOptions={{ headerShown: false }}>
+                {isFirstLaunch ? (
+                  <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                ) : null}
+                <Stack.Screen name="Main" component={MainTabs} />
+              </Stack.Navigator>
+            </AppProvider>
+          </SafeAreaProvider>
+        </AppThemeWrapper>
+      </ThemeProvider>
     </GestureHandlerRootView>
+  );
+}
+
+// Wrapper component to apply theme
+function AppThemeWrapper({ children }: { children: React.ReactNode }) {
+  const { isDark } = useTheme();
+
+  // Apply theme via context instead of wrapping in NavigationContainer
+  // Expo Router already provides a NavigationContainer
+  return (
+    <>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      {children}
+    </>
   );
 }

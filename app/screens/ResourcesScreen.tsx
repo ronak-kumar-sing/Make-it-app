@@ -2,17 +2,23 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { useContext, useState } from 'react';
-import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useContext, useState } from 'react';
+import { Alert, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppContext } from '../context';
+import AIResourceGenerator from '../components/AIResourceGenerator';
+import FormattedNoteViewer from '../components/FormattedNoteViewer';
+import { AppContext } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 const ResourcesScreen = () => {
+  const { theme } = useTheme();
   const { resources, subjects, addResource, updateResource, deleteResource } = useContext(AppContext);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('All');
   const [modalVisible, setModalVisible] = useState(false);
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
+  const [aiGeneratorVisible, setAiGeneratorVisible] = useState(false);
   const [newResource, setNewResource] = useState({
     title: '',
     description: '',
@@ -20,6 +26,7 @@ const ResourcesScreen = () => {
     type: 'note', // 'note', 'document', 'link'
     content: '',
     uri: '',
+    imageUrl: '', // For AI-generated images
   });
 
   // Filter resources based on search query and selected subject
@@ -100,11 +107,28 @@ const ResourcesScreen = () => {
       type: 'note',
       content: '',
       uri: '',
+      imageUrl: '',
     });
   };
 
+  // Save AI-generated resource
+  const saveAiResource = (aiResource) => {
+    const resourceToSave = {
+      title: aiResource.title,
+      description: aiResource.description || '',
+      subject: aiResource.subject || '',
+      type: aiResource.type || 'note',
+      content: aiResource.content || '',
+      uri: aiResource.uri || '',
+      imageUrl: aiResource.imageUrl || '',
+      aiGenerated: true,
+    };
+
+    addResource(resourceToSave);
+  };
+
   // Open a resource
-  const openResource = async (resource) => {
+  const openResource = async (resource, mode = 'preview') => {
     if (resource.type === 'document' && resource.uri) {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(resource.uri);
@@ -112,10 +136,21 @@ const ResourcesScreen = () => {
         Alert.alert('Sharing is not available on this device');
       }
     } else if (resource.type === 'note') {
-      // Show note content in a modal
+      // Set resource for viewing or editing
       setNewResource(resource);
-      setModalVisible(true);
+
+      // Show the appropriate modal based on mode
+      if (mode === 'edit') {
+        setModalVisible(true);
+      } else {
+        setPreviewModalVisible(true);
+      }
     }
+  };
+
+  // Edit resource
+  const editResource = (resource) => {
+    openResource(resource, 'edit');
   };
 
   // Delete a resource
@@ -143,27 +178,47 @@ const ResourcesScreen = () => {
 
     return (
       <TouchableOpacity
-        style={styles.resourceItem}
+        style={[
+          styles.resourceItem,
+          { backgroundColor: theme.card },
+          item.aiGenerated && styles.aiResourceItem
+        ]}
         onPress={() => openResource(item)}
+        onLongPress={() => editResource(item)}
       >
-        <View style={styles.resourceIcon}>
-          <Ionicons
-            name={
-              item.type === 'document'
-                ? 'document-text'
-                : item.type === 'link'
-                ? 'link'
-                : 'create'
-            }
-            size={24}
-            color={subjectColor}
+        {item.imageUrl ? (
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={styles.resourceImage}
+            resizeMode="cover"
           />
-        </View>
+        ) : (
+          <View style={[styles.resourceIcon, { backgroundColor: theme.primaryLight }]}>
+            <Ionicons
+              name={
+                item.type === 'document'
+                  ? 'document-text'
+                  : item.type === 'link'
+                  ? 'link'
+                  : item.aiGenerated
+                  ? 'sparkles'
+                  : 'create'
+              }
+              size={24}
+              color={subjectColor}
+            />
+          </View>
+        )}
 
         <View style={styles.resourceContent}>
-          <Text style={styles.resourceTitle}>{item.title}</Text>
+          <Text style={[styles.resourceTitle, { color: theme.text }]}>
+            {item.title}
+            {item.aiGenerated && (
+              <Text style={styles.aiGeneratedBadge}> • AI</Text>
+            )}
+          </Text>
           {item.description && (
-            <Text style={styles.resourceDescription} numberOfLines={1}>
+            <Text style={[styles.resourceDescription, { color: theme.textSecondary }]} numberOfLines={1}>
               {item.description}
             </Text>
           )}
@@ -174,45 +229,65 @@ const ResourcesScreen = () => {
               </Text>
             </View>
           )}
+
+          {item.type === 'note' && (
+            <TouchableOpacity
+              style={[styles.viewEditButton, { backgroundColor: theme.primaryLight }]}
+              onPress={() => editResource(item)}
+            >
+              <Ionicons name="create-outline" size={14} color={theme.primary} />
+              <Text style={[styles.viewEditButtonText, { color: theme.primary }]}>Edit</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => confirmDeleteResource(item.id)}
         >
-          <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+          <Ionicons name="trash-outline" size={20} color={theme.danger} />
         </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Study Resources</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => {
-            setNewResource({
-              title: '',
-              description: '',
-              subject: '',
-              type: 'note',
-              content: '',
-              uri: '',
-            });
-            setModalVisible(true);
-          }}
-        >
-          <Ionicons name="add" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.background }]}>
+        <Text style={[styles.title, { color: theme.text }]}>Study Resources</Text>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={[styles.aiButton, { marginRight: 12, backgroundColor: theme.accent }]}
+            onPress={() => setAiGeneratorVisible(true)}
+          >
+            <Ionicons name="sparkles" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: theme.primary }]}
+            onPress={() => {
+              setNewResource({
+                title: '',
+                description: '',
+                subject: '',
+                type: 'note',
+                content: '',
+                uri: '',
+                imageUrl: '',
+              });
+              setModalVisible(true);
+            }}
+          >
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+      <View style={[styles.searchContainer, { backgroundColor: theme.card }]}>
+        <Ionicons name="search" size={20} color={theme.textSecondary} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: theme.text }]}
           placeholder="Search resources..."
+          placeholderTextColor={theme.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -223,6 +298,11 @@ const ResourcesScreen = () => {
           <TouchableOpacity
             style={[
               styles.filterButton,
+              {
+                backgroundColor: selectedSubject === 'All'
+                  ? theme.primaryLight
+                  : theme.isDark ? theme.card : '#EEEEEE'
+              },
               selectedSubject === 'All' && styles.activeFilter
             ]}
             onPress={() => setSelectedSubject('All')}
@@ -230,6 +310,7 @@ const ResourcesScreen = () => {
             <Text
               style={[
                 styles.filterText,
+                { color: selectedSubject === 'All' ? theme.primary : theme.textSecondary },
                 selectedSubject === 'All' && styles.activeFilterText
               ]}
             >
@@ -242,6 +323,7 @@ const ResourcesScreen = () => {
               key={subject.id}
               style={[
                 styles.filterButton,
+                { backgroundColor: theme.isDark ? theme.card : '#EEEEEE' },
                 selectedSubject === subject.name && styles.activeFilter,
                 selectedSubject === subject.name && { backgroundColor: `${subject.color}20` }
               ]}
@@ -250,6 +332,7 @@ const ResourcesScreen = () => {
               <Text
                 style={[
                   styles.filterText,
+                  { color: theme.textSecondary },
                   selectedSubject === subject.name && styles.activeFilterText,
                   selectedSubject === subject.name && { color: subject.color }
                 ]}
@@ -267,24 +350,28 @@ const ResourcesScreen = () => {
           keyExtractor={(item) => item}
           renderItem={({ item: type }) => (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
                 {type.charAt(0).toUpperCase() + type.slice(1)}s
               </Text>
-              {groupedResources[type].map(resource => renderResourceItem({ item: resource }))}
+              {groupedResources[type].map(resource => (
+                <React.Fragment key={resource.id}>
+                  {renderResourceItem({ item: resource })}
+                </React.Fragment>
+              ))}
             </View>
           )}
         />
       ) : (
         <View style={styles.emptyState}>
-          <Ionicons name="book" size={64} color="#DDD" />
-          <Text style={styles.emptyStateTitle}>No resources found</Text>
-          <Text style={styles.emptyStateText}>
+          <Ionicons name="book" size={64} color={theme.border} />
+          <Text style={[styles.emptyStateTitle, { color: theme.text }]}>No resources found</Text>
+          <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
             {searchQuery
               ? "No resources match your search"
               : "You haven't added any study resources yet"}
           </Text>
           <TouchableOpacity
-            style={styles.emptyStateButton}
+            style={[styles.emptyStateButton, { backgroundColor: theme.primary }]}
             onPress={() => {
               setNewResource({
                 title: '',
@@ -310,38 +397,40 @@ const ResourcesScreen = () => {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
                 {newResource.id ? 'Edit Resource' : 'Add Resource'}
               </Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
               >
-                <Ionicons name="close" size={24} color="#333" />
+                <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView>
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Resource Type</Text>
+                <Text style={[styles.label, { color: theme.text }]}>Resource Type</Text>
                 <View style={styles.typeSelector}>
                   <TouchableOpacity
                     style={[
                       styles.typeButton,
-                      newResource.type === 'note' && styles.activeTypeButton
+                      { backgroundColor: theme.primaryLight },
+                      newResource.type === 'note' && [styles.activeTypeButton, { backgroundColor: theme.primary }]
                     ]}
                     onPress={() => setNewResource({ ...newResource, type: 'note' })}
                   >
                     <Ionicons
                       name="create"
                       size={20}
-                      color={newResource.type === 'note' ? '#FFFFFF' : '#6C63FF'}
+                      color={newResource.type === 'note' ? '#FFFFFF' : theme.primary}
                     />
                     <Text
                       style={[
                         styles.typeText,
+                        { color: theme.primary },
                         newResource.type === 'note' && styles.activeTypeText
                       ]}
                     >
@@ -352,18 +441,20 @@ const ResourcesScreen = () => {
                   <TouchableOpacity
                     style={[
                       styles.typeButton,
-                      newResource.type === 'document' && styles.activeTypeButton
+                      { backgroundColor: theme.primaryLight },
+                      newResource.type === 'document' && [styles.activeTypeButton, { backgroundColor: theme.primary }]
                     ]}
                     onPress={() => pickDocument()}
                   >
                     <Ionicons
                       name="document-text"
                       size={20}
-                      color={newResource.type === 'document' ? '#FFFFFF' : '#6C63FF'}
+                      color={newResource.type === 'document' ? '#FFFFFF' : theme.primary}
                     />
                     <Text
                       style={[
                         styles.typeText,
+                        { color: theme.primary },
                         newResource.type === 'document' && styles.activeTypeText
                       ]}
                     >
@@ -374,18 +465,20 @@ const ResourcesScreen = () => {
                   <TouchableOpacity
                     style={[
                       styles.typeButton,
-                      newResource.type === 'link' && styles.activeTypeButton
+                      { backgroundColor: theme.primaryLight },
+                      newResource.type === 'link' && [styles.activeTypeButton, { backgroundColor: theme.primary }]
                     ]}
                     onPress={() => setNewResource({ ...newResource, type: 'link' })}
                   >
                     <Ionicons
                       name="link"
                       size={20}
-                      color={newResource.type === 'link' ? '#FFFFFF' : '#6C63FF'}
+                      color={newResource.type === 'link' ? '#FFFFFF' : theme.primary}
                     />
                     <Text
                       style={[
                         styles.typeText,
+                        { color: theme.primary },
                         newResource.type === 'link' && styles.activeTypeText
                       ]}
                     >
@@ -396,22 +489,28 @@ const ResourcesScreen = () => {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Title</Text>
+                <Text style={[styles.label, { color: theme.text }]}>Title</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                   value={newResource.title}
                   onChangeText={(text) => setNewResource({ ...newResource, title: text })}
                   placeholder="Enter resource title"
+                  placeholderTextColor={theme.textSecondary}
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Description</Text>
+                <Text style={[styles.label, { color: theme.text }]}>Description</Text>
                 <TextInput
-                  style={[styles.input, styles.textArea]}
+                  style={[
+                    styles.input,
+                    styles.textArea,
+                    { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }
+                  ]}
                   value={newResource.description}
                   onChangeText={(text) => setNewResource({ ...newResource, description: text })}
                   placeholder="Enter resource description"
+                  placeholderTextColor={theme.textSecondary}
                   multiline
                   numberOfLines={3}
                   textAlignVertical="top"
@@ -419,7 +518,7 @@ const ResourcesScreen = () => {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Subject</Text>
+                <Text style={[styles.label, { color: theme.text }]}>Subject</Text>
                 <View style={styles.subjectContainer}>
                   {subjects.map(subject => (
                     <TouchableOpacity
@@ -445,12 +544,20 @@ const ResourcesScreen = () => {
 
               {newResource.type === 'note' && (
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>Content</Text>
+                  <Text style={[styles.label, { color: theme.text }]}>Content</Text>
+                  <Text style={[styles.formattingHint, { color: theme.textSecondary }]}>
+                    Supports formatting: #Headings, **bold**, *italic*, lists (1. items), bullet points (- items), URLs, and [links](https://example.com)
+                  </Text>
                   <TextInput
-                    style={[styles.input, styles.contentArea]}
+                    style={[
+                      styles.input,
+                      styles.contentArea,
+                      { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }
+                    ]}
                     value={newResource.content}
                     onChangeText={(text) => setNewResource({ ...newResource, content: text })}
                     placeholder="Enter your notes here"
+                    placeholderTextColor={theme.textSecondary}
                     multiline
                     numberOfLines={10}
                     textAlignVertical="top"
@@ -460,24 +567,95 @@ const ResourcesScreen = () => {
 
               {newResource.type === 'link' && (
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>URL</Text>
+                  <Text style={[styles.label, { color: theme.text }]}>URL</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                     value={newResource.uri}
                     onChangeText={(text) => setNewResource({ ...newResource, uri: text })}
                     placeholder="Enter URL"
+                    placeholderTextColor={theme.textSecondary}
                     keyboardType="url"
                   />
                 </View>
               )}
             </ScrollView>
 
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={saveResource}
-            >
-              <Text style={styles.saveButtonText}>Save Resource</Text>
-            </TouchableOpacity>
+            <View style={styles.buttonContainer}>
+              {newResource.type === 'note' && newResource.content && (
+                <TouchableOpacity
+                  style={[styles.previewButton, { backgroundColor: theme.success }]}
+                  onPress={() => {
+                    setModalVisible(false);
+                    setPreviewModalVisible(true);
+                  }}
+                >
+                  <Ionicons name="eye-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.previewButtonText}>Preview</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  { backgroundColor: theme.primary },
+                  newResource.type === 'note' && newResource.content ? { flex: 2 } : { flex: 1 }
+                ]}
+                onPress={saveResource}
+              >
+                <Text style={styles.saveButtonText}>Save Resource</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* AI Resource Generator */}
+      <AIResourceGenerator
+        visible={aiGeneratorVisible}
+        onClose={() => setAiGeneratorVisible(false)}
+        onSaveResource={saveAiResource}
+        theme={theme}
+      />
+
+      {/* Resource Preview Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={previewModalVisible}
+        onRequestClose={() => setPreviewModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={[styles.previewModalContent, { backgroundColor: theme.card }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleContainer}>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>Study Notes</Text>
+                <View style={[styles.previewBadge, { backgroundColor: theme.success }]}>
+                  <Ionicons name="eye-outline" size={14} color="#FFFFFF" />
+                  <Text style={styles.previewBadgeText}>Preview Mode</Text>
+                </View>
+              </View>
+              <View style={styles.headerButtons}>
+                <TouchableOpacity
+                  style={[styles.editButton, { marginRight: 8, backgroundColor: theme.primary }]}
+                  onPress={() => {
+                    setPreviewModalVisible(false);
+                    setModalVisible(true); // Open edit modal
+                  }}
+                >
+                  <Ionicons name="create-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.editButtonText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setPreviewModalVisible(false)}
+                >
+                  <Ionicons name="close" size={24} color={theme.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={[styles.noteViewerContainer, { backgroundColor: theme.background }]}>
+              <FormattedNoteViewer note={newResource} theme={theme} />
+            </View>
           </View>
         </View>
       </Modal>
@@ -488,7 +666,6 @@ const ResourcesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   header: {
     flexDirection: 'row',
@@ -499,10 +676,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   addButton: {
-    backgroundColor: '#6C63FF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -512,7 +698,6 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     marginHorizontal: 16,
     marginBottom: 16,
@@ -530,7 +715,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 40,
     fontSize: 16,
-    color: '#333',
   },
   filterContainer: {
     paddingHorizontal: 16,
@@ -541,16 +725,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 8,
-    backgroundColor: '#EEEEEE',
   },
   activeFilter: {
-    backgroundColor: '#E0DDFF',
+    fontWeight: 'bold',
   },
   filterText: {
-    color: '#666',
+    fontWeight: '500',
   },
   activeFilterText: {
-    color: '#6C63FF',
     fontWeight: 'bold',
   },
   section: {
@@ -560,13 +742,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
   },
   resourceItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
@@ -576,13 +756,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
+  aiResourceItem: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF8A65',
+  },
   resourceIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F0EEFF',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
+  },
+  resourceImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
     marginRight: 12,
   },
   resourceContent: {
@@ -591,12 +780,15 @@ const styles = StyleSheet.create({
   resourceTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
     marginBottom: 4,
+  },
+  aiGeneratedBadge: {
+    fontSize: 12,
+    color: '#FF8A65',
+    fontWeight: 'bold',
   },
   resourceDescription: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 4,
   },
   subjectTag: {
@@ -604,13 +796,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
-    backgroundColor: '#F0EEFF',
     marginRight: 8,
     marginBottom: 8,
   },
   subjectText: {
     fontSize: 12,
-    color: '#6C63FF',
   },
   deleteButton: {
     padding: 8,
@@ -624,17 +814,14 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 16,
   },
   emptyStateText: {
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
     marginTop: 8,
   },
   emptyStateButton: {
-    backgroundColor: '#6C63FF',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,
@@ -649,12 +836,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 8,
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    width: '90%',
-    maxHeight: '80%',
+    width: '95%',
+    maxHeight: '90%',
     padding: 16,
   },
   modalHeader: {
@@ -663,10 +850,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  modalTitleContainer: {
+    flexDirection: 'column',
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+  },
+  previewBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  previewBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
   },
   closeButton: {
     padding: 4,
@@ -677,17 +881,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
   },
+  formattingHint: {
+    fontSize: 12,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
   input: {
-    backgroundColor: '#F8F9FA',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#333',
     borderWidth: 1,
-    borderColor: '#EEEEEE',
   },
   textArea: {
     height: 80,
@@ -702,7 +907,6 @@ const styles = StyleSheet.create({
   typeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0EEFF',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -714,7 +918,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#6C63FF',
   },
   typeText: {
-    color: '#6C63FF',
     marginLeft: 8,
   },
   activeTypeText: {
@@ -724,8 +927,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    gap: 8,
+  },
+  previewButton: {
+    flex: 1,
+    flexDirection: 'row',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 6,
+  },
   saveButton: {
-    backgroundColor: '#6C63FF',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
@@ -735,6 +956,44 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  editButton: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  editButtonText: {
+    color: '#FFFFFF',
+    marginLeft: 4,
+    fontWeight: 'bold',
+  },
+  viewEditButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  viewEditButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  noteViewerContainer: {
+    flex: 1,
+    borderRadius: 8,
+  },
+  previewModalContent: {
+    borderRadius: 12,
+    width: '95%',
+    height: '95%',
+    padding: 16,
+    paddingBottom: 8,
+    flexDirection: 'column',
   },
 });
 

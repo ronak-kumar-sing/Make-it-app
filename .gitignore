@@ -19,6 +19,9 @@ expo-env.d.ts
 *.mobileprovision
 
 # Metro
+
+# API keys
+app/config/apiKeys.js
 .metro-health-check*
 
 # debug

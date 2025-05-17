@@ -4,9 +4,11 @@ import { differenceInDays, format, isPast } from 'date-fns';
 import { useContext, useState } from 'react';
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppContext } from '../context';
+import { AppContext } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 const ExamsScreen = () => {
+  const { theme } = useTheme();
   const { exams, subjects, addExam, updateExam, deleteExam } = useContext(AppContext);
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -132,7 +134,8 @@ const ExamsScreen = () => {
       <TouchableOpacity
         style={[
           styles.examItem,
-          item.completed && styles.completedExamItem
+          { backgroundColor: theme.card },
+          item.completed && { backgroundColor: theme.isDark ? theme.card : '#F8F9FA' }
         ]}
         onPress={() => {
           setNewExam(item);
@@ -144,7 +147,8 @@ const ExamsScreen = () => {
             <Text
               style={[
                 styles.examTitle,
-                item.completed && styles.completedExamTitle
+                { color: theme.text },
+                item.completed && { color: theme.textSecondary, textDecorationLine: 'line-through' }
               ]}
             >
               {item.title}
@@ -161,11 +165,22 @@ const ExamsScreen = () => {
           <TouchableOpacity
             style={[
               styles.statusButton,
-              item.completed ? styles.completedButton : isPastExam ? styles.pastButton : styles.upcomingButton
+              item.completed ?
+                { backgroundColor: `${theme.success}20` } :
+                isPastExam ?
+                  { backgroundColor: `${theme.danger}20` } :
+                  { backgroundColor: `${theme.primary}20` }
             ]}
             onPress={() => toggleExamCompletion(item.id)}
           >
-            <Text style={styles.statusButtonText}>
+            <Text style={[
+              styles.statusButtonText,
+              {
+                color: item.completed ? theme.success :
+                      isPastExam ? theme.danger :
+                      theme.primary
+              }
+            ]}>
               {item.completed ? 'Completed' : isPastExam ? 'Past' : daysUntil}
             </Text>
           </TouchableOpacity>
@@ -173,21 +188,21 @@ const ExamsScreen = () => {
 
         <View style={styles.examDetails}>
           <View style={styles.examDetail}>
-            <Ionicons name="calendar-outline" size={16} color="#666" />
-            <Text style={styles.examDetailText}>{formatDate(item.date)}</Text>
+            <Ionicons name="calendar-outline" size={16} color={theme.textSecondary} />
+            <Text style={[styles.examDetailText, { color: theme.textSecondary }]}>{formatDate(item.date)}</Text>
           </View>
 
           {item.time && (
             <View style={styles.examDetail}>
-              <Ionicons name="time-outline" size={16} color="#666" />
-              <Text style={styles.examDetailText}>{item.time}</Text>
+              <Ionicons name="time-outline" size={16} color={theme.textSecondary} />
+              <Text style={[styles.examDetailText, { color: theme.textSecondary }]}>{item.time}</Text>
             </View>
           )}
 
           {item.location && (
             <View style={styles.examDetail}>
-              <Ionicons name="location-outline" size={16} color="#666" />
-              <Text style={styles.examDetailText}>{item.location}</Text>
+              <Ionicons name="location-outline" size={16} color={theme.textSecondary} />
+              <Text style={[styles.examDetailText, { color: theme.textSecondary }]}>{item.location}</Text>
             </View>
           )}
         </View>
@@ -200,14 +215,14 @@ const ExamsScreen = () => {
               setModalVisible(true);
             }}
           >
-            <Ionicons name="create-outline" size={20} color="#6C63FF" />
+            <Ionicons name="create-outline" size={20} color={theme.primary} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.examAction}
             onPress={() => confirmDeleteExam(item.id)}
           >
-            <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+            <Ionicons name="trash-outline" size={20} color={theme.danger} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -215,11 +230,11 @@ const ExamsScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Exams & Assignments</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Exams & Assignments</Text>
         <TouchableOpacity
-          style={styles.addButton}
+          style={[styles.addButton, { backgroundColor: theme.primary }]}
           onPress={() => {
             setNewExam({
               title: '',
@@ -237,7 +252,7 @@ const ExamsScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {exams.length > 0 ? (
+      {exams && exams.length > 0 ? (
         <FlatList
           data={[
             { title: 'Upcoming', data: upcomingExams },
@@ -247,7 +262,7 @@ const ExamsScreen = () => {
           renderItem={({ item: section }) => (
             section.data.length > 0 ? (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>{section.title}</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{section.title}</Text>
                 {section.data.map(exam => (
                   <View key={exam.id}>
                     {renderExamItem({ item: exam })}
@@ -259,13 +274,13 @@ const ExamsScreen = () => {
         />
       ) : (
         <View style={styles.emptyState}>
-          <Ionicons name="calendar" size={64} color="#DDD" />
-          <Text style={styles.emptyStateTitle}>No exams or assignments</Text>
-          <Text style={styles.emptyStateText}>
+          <Ionicons name="calendar" size={64} color={theme.border} />
+          <Text style={[styles.emptyStateTitle, { color: theme.text }]}>No exams or assignments</Text>
+          <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
             Add your upcoming exams and assignments to keep track of them
           </Text>
           <TouchableOpacity
-            style={styles.emptyStateButton}
+            style={[styles.emptyStateButton, { backgroundColor: theme.primary }]}
             onPress={() => {
               setNewExam({
                 title: '',
@@ -292,37 +307,43 @@ const ExamsScreen = () => {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
                 {newExam.id ? 'Edit Exam' : 'Add Exam'}
               </Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
               >
-                <Ionicons name="close" size={24} color="#333" />
+                <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView>
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Title</Text>
+                <Text style={[styles.label, { color: theme.text }]}>Title</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                   value={newExam.title}
                   onChangeText={(text) => setNewExam({ ...newExam, title: text })}
                   placeholder="Enter exam title"
+                  placeholderTextColor={theme.textSecondary}
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Description</Text>
+                <Text style={[styles.label, { color: theme.text }]}>Description</Text>
                 <TextInput
-                  style={[styles.input, styles.textArea]}
+                  style={[
+                    styles.input,
+                    styles.textArea,
+                    { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }
+                  ]}
                   value={newExam.description}
                   onChangeText={(text) => setNewExam({ ...newExam, description: text })}
                   placeholder="Enter exam description"
+                  placeholderTextColor={theme.textSecondary}
                   multiline
                   numberOfLines={3}
                   textAlignVertical="top"
@@ -330,21 +351,25 @@ const ExamsScreen = () => {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Subject</Text>
+                <Text style={[styles.label, { color: theme.text }]}>Subject</Text>
                 <View style={styles.subjectContainer}>
                   {subjects.map(subject => (
                     <TouchableOpacity
                       key={subject.id}
                       style={[
                         styles.subjectTag,
-                        newExam.subject === subject.name && { backgroundColor: `${subject.color}20` }
+                        {
+                          backgroundColor: newExam.subject === subject.name ?
+                            `${subject.color}20` :
+                            theme.isDark ? theme.card : '#F8F9FA'
+                        }
                       ]}
                       onPress={() => setNewExam({ ...newExam, subject: subject.name })}
                     >
                       <Text
                         style={[
                           styles.subjectText,
-                          newExam.subject === subject.name && { color: subject.color }
+                          { color: newExam.subject === subject.name ? subject.color : theme.textSecondary }
                         ]}
                       >
                         {subject.name}
@@ -355,13 +380,13 @@ const ExamsScreen = () => {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Date</Text>
+                <Text style={[styles.label, { color: theme.text }]}>Date</Text>
                 <TouchableOpacity
-                  style={styles.dateButton}
+                  style={[styles.dateButton, { backgroundColor: theme.primaryLight }]}
                   onPress={() => setShowDatePicker(true)}
                 >
-                  <Ionicons name="calendar-outline" size={20} color="#6C63FF" />
-                  <Text style={styles.dateText}>
+                  <Ionicons name="calendar-outline" size={20} color={theme.primary} />
+                  <Text style={[styles.dateText, { color: theme.primary }]}>
                     {format(newExam.date, 'EEEE, MMMM d, yyyy')}
                   </Text>
                 </TouchableOpacity>
@@ -377,22 +402,24 @@ const ExamsScreen = () => {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Time</Text>
+                <Text style={[styles.label, { color: theme.text }]}>Time</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                   value={newExam.time}
                   onChangeText={(text) => setNewExam({ ...newExam, time: text })}
                   placeholder="Enter exam time (e.g. 09:00)"
+                  placeholderTextColor={theme.textSecondary}
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Location</Text>
+                <Text style={[styles.label, { color: theme.text }]}>Location</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
                   value={newExam.location}
                   onChangeText={(text) => setNewExam({ ...newExam, location: text })}
                   placeholder="Enter exam location"
+                  placeholderTextColor={theme.textSecondary}
                 />
               </View>
 
@@ -401,7 +428,10 @@ const ExamsScreen = () => {
                   <TouchableOpacity
                     style={[
                       styles.checkbox,
-                      { backgroundColor: newExam.completed ? '#6C63FF' : 'transparent' }
+                      {
+                        backgroundColor: newExam.completed ? theme.primary : 'transparent',
+                        borderColor: theme.primary
+                      }
                     ]}
                     onPress={() => setNewExam({ ...newExam, completed: !newExam.completed })}
                   >
@@ -409,13 +439,13 @@ const ExamsScreen = () => {
                       <Ionicons name="checkmark" size={16} color="#FFFFFF" />
                     )}
                   </TouchableOpacity>
-                  <Text style={styles.checkboxLabel}>Mark as completed</Text>
+                  <Text style={[styles.checkboxLabel, { color: theme.text }]}>Mark as completed</Text>
                 </View>
               </View>
             </ScrollView>
 
             <TouchableOpacity
-              style={styles.saveButton}
+              style={[styles.saveButton, { backgroundColor: theme.primary }]}
               onPress={saveExam}
             >
               <Text style={styles.saveButtonText}>Save</Text>
@@ -430,7 +460,6 @@ const ExamsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   header: {
     flexDirection: 'row',
@@ -441,10 +470,8 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
   },
   addButton: {
-    backgroundColor: '#6C63FF',
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -458,11 +485,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
   },
   examItem: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 16,
     marginBottom: 8,
@@ -471,9 +496,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-  },
-  completedExamItem: {
-    backgroundColor: '#F8F9FA',
   },
   examHeader: {
     flexDirection: 'row',
@@ -488,44 +510,26 @@ const styles = StyleSheet.create({
   examTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 4,
-  },
-  completedExamTitle: {
-    textDecorationLine: 'line-through',
-    color: '#999',
   },
   subjectTag: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
-    backgroundColor: '#F0EEFF',
     marginBottom: 4,
   },
   subjectText: {
     fontSize: 12,
-    color: '#6C63FF',
   },
   statusButton: {
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 16,
-    backgroundColor: '#F0EEFF',
-  },
-  upcomingButton: {
-    backgroundColor: '#E3F2FD',
-  },
-  pastButton: {
-    backgroundColor: '#FFEBEE',
-  },
-  completedButton: {
-    backgroundColor: '#E8F5E9',
   },
   statusButtonText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#6C63FF',
   },
   examDetails: {
     marginBottom: 8,
@@ -537,7 +541,6 @@ const styles = StyleSheet.create({
   },
   examDetailText: {
     fontSize: 14,
-    color: '#666',
     marginLeft: 8,
   },
   examActions: {
@@ -557,17 +560,14 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 16,
   },
   emptyStateText: {
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
     marginTop: 8,
   },
   emptyStateButton: {
-    backgroundColor: '#6C63FF',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,
@@ -584,7 +584,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     width: '90%',
     maxHeight: '80%',
@@ -599,7 +598,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
   },
   closeButton: {
     padding: 4,
@@ -610,17 +608,13 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#F8F9FA',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#333',
     borderWidth: 1,
-    borderColor: '#EEEEEE',
   },
   textArea: {
     height: 80,
@@ -632,7 +626,6 @@ const styles = StyleSheet.create({
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0EEFF',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -640,7 +633,6 @@ const styles = StyleSheet.create({
   dateText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#6C63FF',
   },
   checkboxContainer: {
     flexDirection: 'row',
@@ -651,17 +643,14 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#6C63FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxLabel: {
     fontSize: 16,
-    color: '#333',
     marginLeft: 8,
   },
   saveButton: {
-    backgroundColor: '#6C63FF',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',

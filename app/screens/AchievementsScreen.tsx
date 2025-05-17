@@ -2,10 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useContext } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppContext } from '../context';
+import { AppContext } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 const AchievementsScreen = () => {
   const { achievements, stats, streaks } = useContext(AppContext);
+  const { theme } = useTheme();
 
   // Define all achievements
   const achievementsList = [
@@ -131,36 +133,36 @@ const AchievementsScreen = () => {
   const achievementPercentage = Math.round((unlockedAchievements / totalAchievements) * 100);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView>
         <View style={styles.header}>
-          <Text style={styles.title}>Achievements</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Achievements</Text>
         </View>
 
-        <View style={styles.statsContainer}>
+        <View style={[styles.statsContainer, { backgroundColor: theme.card }]}>
           <View style={styles.progressContainer}>
-            <View style={styles.progressCircle}>
-              <Text style={styles.progressText}>{achievementPercentage}%</Text>
+            <View style={[styles.progressCircle, { backgroundColor: theme.primaryLight }]}>
+              <Text style={[styles.progressText, { color: theme.primary }]}>{achievementPercentage}%</Text>
             </View>
-            <Text style={styles.progressLabel}>Completed</Text>
+            <Text style={[styles.progressLabel, { color: theme.textSecondary }]}>Completed</Text>
           </View>
 
           <View style={styles.statsDetails}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{unlockedAchievements}</Text>
-              <Text style={styles.statLabel}>Unlocked</Text>
+              <Text style={[styles.statValue, { color: theme.text }]}>{unlockedAchievements}</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Unlocked</Text>
             </View>
 
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{totalAchievements - unlockedAchievements}</Text>
-              <Text style={styles.statLabel}>Locked</Text>
+              <Text style={[styles.statValue, { color: theme.text }]}>{totalAchievements - unlockedAchievements}</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Locked</Text>
             </View>
           </View>
         </View>
 
         {Object.keys(groupedAchievements).map(category => (
-          <View key={category} style={styles.section}>
-            <Text style={styles.sectionTitle}>{category}</Text>
+          <View key={category} style={[styles.section, { backgroundColor: theme.card }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>{category}</Text>
 
             {groupedAchievements[category].map(achievement => {
               const isUnlocked = achievements.unlocked?.includes(achievement.id);
@@ -174,14 +176,15 @@ const AchievementsScreen = () => {
                   key={achievement.id}
                   style={[
                     styles.achievementCard,
-                    isUnlocked && styles.unlockedAchievementCard
+                    { backgroundColor: theme.isDark ? theme.card : '#F8F9FA' },
+                    isUnlocked && [styles.unlockedAchievementCard, { backgroundColor: theme.primaryLight }]
                   ]}
                 >
                   <View style={styles.achievementHeader}>
                     <View
                       style={[
                         styles.achievementIcon,
-                        { backgroundColor: isUnlocked ? achievement.color : '#CCCCCC' }
+                        { backgroundColor: isUnlocked ? achievement.color : theme.isDark ? '#555555' : '#CCCCCC' }
                       ]}
                     >
                       <Ionicons
@@ -195,28 +198,29 @@ const AchievementsScreen = () => {
                       <Text
                         style={[
                           styles.achievementTitle,
-                          isUnlocked && styles.unlockedAchievementTitle
+                          { color: theme.text },
+                          isUnlocked && { color: theme.primary }
                         ]}
                       >
                         {achievement.title}
                       </Text>
-                      <Text style={styles.achievementDescription}>
+                      <Text style={[styles.achievementDescription, { color: theme.textSecondary }]}>
                         {achievement.description}
                       </Text>
                     </View>
                   </View>
 
-                  <View style={styles.progressBarContainer}>
+                  <View style={[styles.progressBarContainer, { backgroundColor: theme.isDark ? '#444444' : '#EEEEEE' }]}>
                     <View
                       style={[
                         styles.progressBar,
-                        { width: `${progressPercentage}%` },
+                        { width: `${progressPercentage}%`, backgroundColor: theme.isDark ? '#666666' : '#CCCCCC' },
                         isUnlocked && { backgroundColor: achievement.color }
                       ]}
                     />
                   </View>
 
-                  <Text style={styles.progressStatus}>
+                  <Text style={[styles.progressStatus, { color: theme.textSecondary }]}>
                     {isUnlocked
                       ? 'Completed!'
                       : `${achievement.progress} / ${achievement.threshold}`}
@@ -228,8 +232,8 @@ const AchievementsScreen = () => {
         ))}
 
         <View style={styles.privacyNote}>
-          <Ionicons name="lock-closed-outline" size={16} color="#666" />
-          <Text style={styles.privacyText}>
+          <Ionicons name="lock-closed-outline" size={16} color={theme.textSecondary} />
+          <Text style={[styles.privacyText, { color: theme.textSecondary }]}>
             All achievement data is stored locally on your device.
           </Text>
         </View>
@@ -241,7 +245,6 @@ const AchievementsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   header: {
     padding: 16,
@@ -249,11 +252,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
   },
   statsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     margin: 16,
     padding: 16,
@@ -271,18 +272,15 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#F0EEFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   progressText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#6C63FF',
   },
   progressLabel: {
     fontSize: 14,
-    color: '#666',
     marginTop: 8,
   },
   statsDetails: {
@@ -295,14 +293,11 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
   },
   section: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     margin: 16,
     marginTop: 0,
@@ -316,11 +311,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 16,
   },
   achievementCard: {
-    backgroundColor: '#F8F9FA',
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
@@ -336,7 +329,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#CCCCCC',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -347,7 +339,6 @@ const styles = StyleSheet.create({
   achievementTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 4,
   },
   unlockedAchievementTitle: {
@@ -355,22 +346,18 @@ const styles = StyleSheet.create({
   },
   achievementDescription: {
     fontSize: 14,
-    color: '#666',
   },
   progressBarContainer: {
     height: 8,
-    backgroundColor: '#EEEEEE',
     borderRadius: 4,
     marginBottom: 8,
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#CCCCCC',
     borderRadius: 4,
   },
   progressStatus: {
     fontSize: 12,
-    color: '#666',
     textAlign: 'right',
   },
   privacyNote: {
@@ -382,7 +369,6 @@ const styles = StyleSheet.create({
   },
   privacyText: {
     fontSize: 12,
-    color: '#666',
     marginLeft: 8,
   },
 });

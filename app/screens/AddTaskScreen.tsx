@@ -3,19 +3,21 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import { useContext, useState } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppContext } from '../context';
+import { AppContext } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 const AddTaskScreen = () => {
   const navigation = useNavigation();
   const { addTask, subjects } = useContext(AppContext);
+  const { theme } = useTheme();
 
   // Task state
   const [title, setTitle] = useState('');
@@ -73,27 +75,27 @@ const AddTaskScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.card }]}>
       <ScrollView>
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Task Title *</Text>
+          <Text style={[styles.label, { color: theme.text }]}>Task Title *</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
             value={title}
             onChangeText={setTitle}
             placeholder="Enter task title"
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.textSecondary}
           />
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Description</Text>
+          <Text style={[styles.label, { color: theme.text }]}>Description</Text>
           <TextInput
-            style={[styles.input, styles.textArea]}
+            style={[styles.input, styles.textArea, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
             value={description}
             onChangeText={setDescription}
             placeholder="Enter task description"
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.textSecondary}
             multiline
             numberOfLines={4}
             textAlignVertical="top"
@@ -101,20 +103,22 @@ const AddTaskScreen = () => {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Subject</Text>
+          <Text style={[styles.label, { color: theme.text }]}>Subject</Text>
           <View style={styles.subjectContainer}>
             {subjectOptions.map((item) => (
               <TouchableOpacity
                 key={item}
                 style={[
                   styles.subjectTag,
-                  subject === item && styles.selectedSubject
+                  { backgroundColor: theme.isDark ? theme.card : '#E1F5FE' },
+                  subject === item && [styles.selectedSubject, { backgroundColor: '#01579B' }]
                 ]}
                 onPress={() => setSubject(item)}
               >
                 <Text
                   style={[
                     styles.subjectText,
+                    { color: theme.isDark ? theme.primary : '#01579B' },
                     subject === item && styles.selectedSubjectText
                   ]}
                 >
@@ -126,11 +130,12 @@ const AddTaskScreen = () => {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Priority</Text>
+          <Text style={[styles.label, { color: theme.text }]}>Priority</Text>
           <View style={styles.priorityContainer}>
             <TouchableOpacity
               style={[
                 styles.priorityButton,
+                { backgroundColor: theme.isDark ? theme.card : '#F5F5F5' },
                 priority === 'low' && styles.selectedPriorityLow
               ]}
               onPress={() => setPriority('low')}
@@ -143,7 +148,7 @@ const AddTaskScreen = () => {
               <Text
                 style={[
                   styles.priorityText,
-                  priority === 'low' && styles.selectedPriorityText
+                  { color: priority === 'low' ? '#FFFFFF' : '#4CAF50' }
                 ]}
               >
                 Low
@@ -153,6 +158,7 @@ const AddTaskScreen = () => {
             <TouchableOpacity
               style={[
                 styles.priorityButton,
+                { backgroundColor: theme.isDark ? theme.card : '#F5F5F5' },
                 priority === 'medium' && styles.selectedPriorityMedium
               ]}
               onPress={() => setPriority('medium')}
@@ -165,7 +171,7 @@ const AddTaskScreen = () => {
               <Text
                 style={[
                   styles.priorityText,
-                  priority === 'medium' && styles.selectedPriorityText
+                  { color: priority === 'medium' ? '#FFFFFF' : '#FF9800' }
                 ]}
               >
                 Medium
@@ -175,6 +181,7 @@ const AddTaskScreen = () => {
             <TouchableOpacity
               style={[
                 styles.priorityButton,
+                { backgroundColor: theme.isDark ? theme.card : '#F5F5F5' },
                 priority === 'high' && styles.selectedPriorityHigh
               ]}
               onPress={() => setPriority('high')}
@@ -187,7 +194,7 @@ const AddTaskScreen = () => {
               <Text
                 style={[
                   styles.priorityText,
-                  priority === 'high' && styles.selectedPriorityText
+                  { color: priority === 'high' ? '#FFFFFF' : '#F44336' }
                 ]}
               >
                 High
@@ -197,13 +204,13 @@ const AddTaskScreen = () => {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Due Date</Text>
+          <Text style={[styles.label, { color: theme.text }]}>Due Date</Text>
           <TouchableOpacity
-            style={styles.dateButton}
+            style={[styles.dateButton, { backgroundColor: theme.primaryLight }]}
             onPress={() => setShowDatePicker(true)}
           >
-            <Ionicons name="calendar-outline" size={20} color="#6C63FF" />
-            <Text style={styles.dateText}>{formatDate(dueDate)}</Text>
+            <Ionicons name="calendar-outline" size={20} color={theme.primary} />
+            <Text style={[styles.dateText, { color: theme.primary }]}>{formatDate(dueDate)}</Text>
           </TouchableOpacity>
 
           {showDatePicker && (
@@ -218,7 +225,7 @@ const AddTaskScreen = () => {
         </View>
 
         <TouchableOpacity
-          style={styles.createButton}
+          style={[styles.createButton, { backgroundColor: theme.primary }]}
           onPress={handleCreateTask}
         >
           <Text style={styles.createButtonText}>Create Task</Text>
@@ -231,7 +238,6 @@ const AddTaskScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     padding: 16,
   },
   formGroup: {
@@ -240,17 +246,13 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#F8F9FA',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#333',
     borderWidth: 1,
-    borderColor: '#EEEEEE',
   },
   textArea: {
     height: 100,
@@ -260,17 +262,15 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   subjectTag: {
-    backgroundColor: '#F0EEFF',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
     margin: 4,
   },
   selectedSubject: {
-    backgroundColor: '#6C63FF',
+    backgroundColor: '#01579B',
   },
   subjectText: {
-    color: '#6C63FF',
     fontSize: 14,
   },
   selectedSubjectText: {
@@ -283,7 +283,6 @@ const styles = StyleSheet.create({
   priorityButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -302,7 +301,6 @@ const styles = StyleSheet.create({
   priorityText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#666',
   },
   selectedPriorityText: {
     color: '#FFFFFF',
@@ -311,7 +309,6 @@ const styles = StyleSheet.create({
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0EEFF',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -319,10 +316,8 @@ const styles = StyleSheet.create({
   dateText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#6C63FF',
   },
   createButton: {
-    backgroundColor: '#6C63FF',
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',

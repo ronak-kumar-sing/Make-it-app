@@ -3,12 +3,14 @@ import { useContext } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppContext } from '../context';
+import { AppContext } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 const AnalyticsScreen = () => {
   const { stats, subjects } = useContext(AppContext);
+  const { theme } = useTheme();
 
   // Prepare data for weekly study time chart
   const weeklyData = {
@@ -53,7 +55,7 @@ const AnalyticsScreen = () => {
           name: subjectName,
           minutes,
           color: subjects.find(s => s.name === subjectName)?.color || '#607D8B',
-          legendFontColor: '#7F7F7F',
+          legendFontColor: theme.textSecondary,
           legendFontSize: 12,
         });
         subjectColors.push(subjects.find(s => s.name === subjectName)?.color || '#607D8B');
@@ -66,53 +68,54 @@ const AnalyticsScreen = () => {
     subjectData.push({
       name: 'No Data',
       minutes: 1,
-      color: '#CCCCCC',
-      legendFontColor: '#7F7F7F',
+      color: theme.isDark ? '#555555' : '#CCCCCC',
+      legendFontColor: theme.textSecondary,
       legendFontSize: 12,
     });
   }
 
   // Chart configuration
   const chartConfig = {
-    backgroundGradientFrom: '#FFFFFF',
-    backgroundGradientTo: '#FFFFFF',
+    backgroundGradientFrom: theme.card,
+    backgroundGradientTo: theme.card,
     color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`,
     strokeWidth: 2,
     barPercentage: 0.7,
     useShadowColorFromDataset: false,
     decimalPlaces: 0,
+    labelColor: () => theme.textSecondary,
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView>
         <View style={styles.header}>
-          <Text style={styles.title}>Analytics</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Analytics</Text>
         </View>
 
         <View style={styles.summaryContainer}>
-          <View style={styles.summaryCard}>
-            <Ionicons name="time-outline" size={24} color="#6C63FF" />
-            <Text style={styles.summaryValue}>{stats.totalStudyTime} min</Text>
-            <Text style={styles.summaryLabel}>Total Study Time</Text>
+          <View style={[styles.summaryCard, { backgroundColor: theme.card }]}>
+            <Ionicons name="time-outline" size={24} color={theme.primary} />
+            <Text style={[styles.summaryValue, { color: theme.text }]}>{(stats.totalStudyTime / 60).toFixed(1)} hrs</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Total Study Time</Text>
           </View>
 
-          <View style={styles.summaryCard}>
-            <Ionicons name="checkmark-circle-outline" size={24} color="#6C63FF" />
-            <Text style={styles.summaryValue}>{stats.tasksCompleted}</Text>
-            <Text style={styles.summaryLabel}>Tasks Completed</Text>
+          <View style={[styles.summaryCard, { backgroundColor: theme.card }]}>
+            <Ionicons name="checkmark-circle-outline" size={24} color={theme.primary} />
+            <Text style={[styles.summaryValue, { color: theme.text }]}>{stats.tasksCompleted}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Tasks Completed</Text>
           </View>
 
-          <View style={styles.summaryCard}>
-            <Ionicons name="timer-outline" size={24} color="#6C63FF" />
-            <Text style={styles.summaryValue}>{stats.sessionsCompleted}</Text>
-            <Text style={styles.summaryLabel}>Focus Sessions</Text>
+          <View style={[styles.summaryCard, { backgroundColor: theme.card }]}>
+            <Ionicons name="timer-outline" size={24} color={theme.primary} />
+            <Text style={[styles.summaryValue, { color: theme.text }]}>{stats.sessionsCompleted}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Focus Sessions</Text>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Weekly Study Time</Text>
-          <Text style={styles.sectionSubtitle}>Minutes studied each day of the week</Text>
+        <View style={[styles.section, { backgroundColor: theme.card }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Weekly Study Time</Text>
+          <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>Hours studied each day of the week</Text>
 
           <BarChart
             data={weeklyData}
@@ -125,9 +128,9 @@ const AnalyticsScreen = () => {
           />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Subject Distribution</Text>
-          <Text style={styles.sectionSubtitle}>Time spent on each subject</Text>
+        <View style={[styles.section, { backgroundColor: theme.card }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Subject Distribution</Text>
+          <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>Time spent on each subject</Text>
 
           <PieChart
             data={subjectData}
@@ -142,9 +145,9 @@ const AnalyticsScreen = () => {
           />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Productivity by Time of Day</Text>
-          <Text style={styles.sectionSubtitle}>When you're most productive</Text>
+        <View style={[styles.section, { backgroundColor: theme.card }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Productivity by Time of Day</Text>
+          <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>When you're most productive</Text>
 
           <BarChart
             data={productivityData}
@@ -157,35 +160,35 @@ const AnalyticsScreen = () => {
           />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Insights</Text>
+        <View style={[styles.section, { backgroundColor: theme.card }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Insights</Text>
 
-          <View style={styles.insightCard}>
+          <View style={[styles.insightCard, { backgroundColor: theme.background }]}>
             <Ionicons name="bulb-outline" size={24} color="#FFC107" />
             <View style={styles.insightContent}>
-              <Text style={styles.insightTitle}>Best Study Time</Text>
-              <Text style={styles.insightText}>
+              <Text style={[styles.insightTitle, { color: theme.text }]}>Best Study Time</Text>
+              <Text style={[styles.insightText, { color: theme.textSecondary }]}>
                 {hourlyData.indexOf(Math.max(...hourlyData)) * 3}:00 - {hourlyData.indexOf(Math.max(...hourlyData)) * 3 + 3}:00 is your most productive time.
               </Text>
             </View>
           </View>
 
-          <View style={styles.insightCard}>
+          <View style={[styles.insightCard, { backgroundColor: theme.background }]}>
             <Ionicons name="calendar-outline" size={24} color="#4CAF50" />
             <View style={styles.insightContent}>
-              <Text style={styles.insightTitle}>Most Productive Day</Text>
-              <Text style={styles.insightText}>
+              <Text style={[styles.insightTitle, { color: theme.text }]}>Most Productive Day</Text>
+              <Text style={[styles.insightText, { color: theme.textSecondary }]}>
                 {weeklyData.labels[stats.weeklyStudyTime.indexOf(Math.max(...stats.weeklyStudyTime))]} is your most productive day of the week.
               </Text>
             </View>
           </View>
 
           {subjectData.length > 1 && (
-            <View style={styles.insightCard}>
+            <View style={[styles.insightCard, { backgroundColor: theme.background }]}>
               <Ionicons name="book-outline" size={24} color="#2196F3" />
               <View style={styles.insightContent}>
-                <Text style={styles.insightTitle}>Focus Distribution</Text>
-                <Text style={styles.insightText}>
+                <Text style={[styles.insightTitle, { color: theme.text }]}>Focus Distribution</Text>
+                <Text style={[styles.insightText, { color: theme.textSecondary }]}>
                   You spend most of your time studying {subjectData.sort((a, b) => b.minutes - a.minutes)[0].name}.
                 </Text>
               </View>
@@ -194,8 +197,8 @@ const AnalyticsScreen = () => {
         </View>
 
         <View style={styles.privacyNote}>
-          <Ionicons name="lock-closed-outline" size={16} color="#666" />
-          <Text style={styles.privacyText}>
+          <Ionicons name="lock-closed-outline" size={16} color={theme.textSecondary} />
+          <Text style={[styles.privacyText, { color: theme.textSecondary }]}>
             All analytics are calculated locally on your device and are never shared.
           </Text>
         </View>
@@ -207,7 +210,6 @@ const AnalyticsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   header: {
     padding: 16,
@@ -215,7 +217,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
   },
   summaryContainer: {
     flexDirection: 'row',
@@ -223,7 +224,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   summaryCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -237,17 +237,14 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 8,
   },
   summaryLabel: {
     fontSize: 12,
-    color: '#666',
     textAlign: 'center',
     marginTop: 4,
   },
   section: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     margin: 16,
     marginTop: 0,
@@ -261,11 +258,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
   },
   sectionSubtitle: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 16,
   },
   chart: {
@@ -274,7 +269,6 @@ const styles = StyleSheet.create({
   },
   insightCard: {
     flexDirection: 'row',
-    backgroundColor: '#F8F9FA',
     borderRadius: 8,
     padding: 16,
     marginVertical: 8,
@@ -286,12 +280,10 @@ const styles = StyleSheet.create({
   insightTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 4,
   },
   insightText: {
     fontSize: 14,
-    color: '#666',
   },
   privacyNote: {
     flexDirection: 'row',
@@ -302,7 +294,6 @@ const styles = StyleSheet.create({
   },
   privacyText: {
     fontSize: 12,
-    color: '#666',
     marginLeft: 8,
   },
 });

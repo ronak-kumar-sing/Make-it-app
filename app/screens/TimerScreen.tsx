@@ -1,33 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useContext, useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import ProgressRing from '../../components/ProgressRing';
-import { AppContext } from '../context';
+import { Animated, Easing, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ProgressRing from '../components/ProgressRing';
+import { AppContext } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 
 const TimerScreen = () => {
-  const { settings, recordStudySession, tasks, subjects, updateTask } = useContext(AppContext);
+  const { theme } = useTheme();
+  const { settings, tasks, subjects, recordStudySession } = useContext(AppContext);
 
-  // Timer states
+  const [timerMode, setTimerMode] = useState('pomodoro');
+  const [timeLeft, setTimeLeft] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [timerMode, setTimerMode] = useState('pomodoro'); // 'pomodoro', 'shortBreak', 'longBreak'
-  const [timeLeft, setTimeLeft] = useState(settings.pomodoroLength * 60);
   const [sessionsCompleted, setSessionsCompleted] = useState(0);
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState(null);
 
-  // Animation value
+  // Animation for the pulsing effect
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Get total seconds based on timer mode - ensure we use latest settings
+  // Get total seconds based on timer mode
   const getTotalSeconds = () => {
     switch (timerMode) {
       case 'pomodoro':
@@ -41,11 +33,90 @@ const TimerScreen = () => {
     }
   };
 
-  // Format time for display
+  // Format time display (mm:ss)
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    if (!isRunning || timeLeft === 0) {
+      setTimeLeft(getTotalSeconds());
+    }
+  }, [settings.pomodoroLength, settings.shortBreakLength, settings.longBreakLength, timerMode]);
+
+  // Calculate progress
+  const progress = 1 - (timeLeft / getTotalSeconds());
+
+  // Get color based on timer mode
+  const getTimerColor = () => {
+    switch (timerMode) {
+      case 'pomodoro':
+        return theme.primary;
+      case 'shortBreak':
+        return theme.success;
+      case 'longBreak':
+        return '#2196F3'; // Keep this color as it's not in the theme
+      default:
+        return theme.primary;
+    }
+  };
+
+  // Get background color
+  const getBackgroundColor = () => {
+    switch (timerMode) {
+      case 'pomodoro':
+        return theme.primaryLight;
+      case 'shortBreak':
+        return `${theme.success}20`;
+      case 'longBreak':
+        return '#E3F2FD'; // Light blue background
+      default:
+        return theme.primaryLight;
+    }
+  };
+
+  // Timer logic
+  useEffect(() => {
+    let interval = null;
+    if (isRunning && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft(timeLeft - 1);
+      }, 1000);
+    } else if (isRunning && timeLeft === 0) {
+      handleTimerComplete();
+    }
+    return () => clearInterval(interval);
+  }, [isRunning, timeLeft]);
+
+  // Handle timer completion
+  const handleTimerComplete = (wasSkipped = false) => {
+    setIsRunning(false);
+
+    // If pomodoro session completed
+    if (timerMode === 'pomodoro') {
+      const newSessionsCompleted = sessionsCompleted + 1;
+      setSessionsCompleted(newSessionsCompleted);
+
+      // Record study time in streaks
+      if (!wasSkipped) {
+        recordStudySession(settings.pomodoroLength, selectedSubject, selectedTaskId);
+      }
+
+      // Check if it's time for a long break
+      if (newSessionsCompleted % settings.longBreakInterval === 0) {
+        setTimerMode('longBreak');
+      } else {
+        setTimerMode('shortBreak');
+      }
+    } else {
+      // After break, return to pomodoro
+      setTimerMode('pomodoro');
+    }
+
+    // Reset timer
+    setTimeLeft(getTotalSeconds());
   };
 
   // Reset timer
@@ -95,75 +166,7 @@ const TimerScreen = () => {
     });
   };
 
-  // Handle timer completion
-  const handleTimerComplete = (skipped = false) => {
-    if (timerMode === 'pomodoro') {
-      // Calculate time spent
-      const timeSpent = getTotalSeconds() - timeLeft; // Time actually spent in seconds
-      const minutesSpent = Math.floor(timeSpent / 60);
-      const isSessionComplete = !skipped || (timeSpent >= getTotalSeconds() * 0.8);
-
-      // Only count if not skipped OR if user spent at least 80% of the timer
-      if (isSessionComplete) {
-        // Record the actual time spent (converted to minutes)
-        recordStudySession(minutesSpent > 0 ? minutesSpent : 1, selectedSubject);
-
-        // Increment sessions completed
-        setSessionsCompleted(prev => prev + 1);
-
-        // If a task was selected, update its progress
-        if (selectedTaskId) {
-          const selectedTask = tasks.find(task => task.id === selectedTaskId);
-          if (selectedTask) {
-            // Add progress to the task (assume each completed session is 25% progress)
-            const newProgress = Math.min(100, (selectedTask.progress || 0) + 25);
-
-            // If progress reaches 100%, mark task as completed
-            if (newProgress >= 100) {
-              updateTask(selectedTaskId, {
-                progress: 100,
-                completed: true,
-                completedAt: new Date().toISOString()
-              });
-            } else {
-              updateTask(selectedTaskId, { progress: newProgress });
-            }
-          }
-        }
-      }
-
-      // Determine if we should take a long break or short break
-      const nextMode = (sessionsCompleted + 1) % settings.longBreakInterval === 0 ?
-        'longBreak' : 'shortBreak';
-
-      resetTimer(nextMode);
-    } else {
-      // Break is over, start a new pomodoro
-      resetTimer('pomodoro');
-    }
-
-    // Reset selected task for next session
-    setSelectedTaskId(null);
-
-    // Play notification sound or vibration here
-  };
-
-  // Timer effect
-  useEffect(() => {
-    let interval;
-
-    if (isRunning && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft(prev => prev - 1);
-      }, 1000);
-    } else if (isRunning && timeLeft === 0) {
-      handleTimerComplete(false); // Timer completed naturally, not skipped
-    }
-
-    return () => clearInterval(interval);
-  }, [isRunning, timeLeft]);
-
-  // Start/stop animation effect
+  // Start the pulse animation when timer is running
   useEffect(() => {
     if (isRunning) {
       startPulseAnimation();
@@ -172,96 +175,33 @@ const TimerScreen = () => {
     }
   }, [isRunning]);
 
-  // Sync with settings changes
-  useEffect(() => {
-    // If timer is not running or just initialized, update the timer duration based on settings
-    if (!isRunning || timeLeft === 0) {
-      setTimeLeft(getTotalSeconds());
-    }
-  }, [settings.pomodoroLength, settings.shortBreakLength, settings.longBreakLength, timerMode]);
-
-  // Calculate progress
-  const progress = 1 - (timeLeft / getTotalSeconds());
-
-  // Get color based on timer mode
-  const getTimerColor = () => {
-    switch (timerMode) {
-      case 'pomodoro':
-        return '#6C63FF';
-      case 'shortBreak':
-        return '#4CAF50';
-      case 'longBreak':
-        return '#2196F3';
-      default:
-        return '#6C63FF';
-    }
-  };
-
-  // Get background color
-  const getBackgroundColor = () => {
-    switch (timerMode) {
-      case 'pomodoro':
-        return '#F0EEFF';
-      case 'shortBreak':
-        return '#E8F5E9';
-      case 'longBreak':
-        return '#E3F2FD';
-      default:
-        return '#F0EEFF';
-    }
-  };
-
-  // Get unique subjects from tasks and add default subjects
-  const getAvailableSubjects = () => {
-    // Extract subjects from incomplete tasks
-    const taskSubjects = tasks
-      .filter(task => !task.completed && !task.archived)
-      .map(task => task.subject)
-      .filter(Boolean);
-
-    // Get unique subjects
-    const uniqueSubjects = [...new Set(taskSubjects)];
-
-    // Include standard subjects if they're not already in the list
-    subjects.forEach(subj => {
-      if (!uniqueSubjects.includes(subj.name)) {
-        uniqueSubjects.push(subj.name);
-      }
-    });
-
-    return uniqueSubjects;
-  };
-
   return (
     <SafeAreaView
-      style={[
-        styles.container,
-        { backgroundColor: getBackgroundColor() }
-      ]}
+      style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <StatusBar backgroundColor={getBackgroundColor()} barStyle="dark-content" />
+      <StatusBar backgroundColor={getBackgroundColor()} barStyle={theme.statusBar} />
 
       <View style={styles.header}>
-        <Text style={styles.title}>Focus Timer</Text>
-        <View style={styles.sessionsContainer}>
-          <Text style={styles.sessionsText}>{sessionsCompleted} sessions today</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Focus Timer</Text>
+        <View style={[styles.sessionsContainer, { backgroundColor: theme.card }]}>
+          <Text style={[styles.sessionsText, { color: theme.textSecondary }]}>{sessionsCompleted} sessions today</Text>
         </View>
       </View>
 
-      <View style={styles.tabContainer}>
+      <View style={[styles.tabContainer, { backgroundColor: theme.card }]}>
         <TouchableOpacity
           style={[
             styles.tab,
             timerMode === 'pomodoro' && styles.activeTab,
-            timerMode === 'pomodoro' && { backgroundColor: '#6C63FF20' }
+            timerMode === 'pomodoro' && { backgroundColor: `${theme.primary}20` }
           ]}
           onPress={() => resetTimer('pomodoro')}
         >
           <Text
             style={[
               styles.tabText,
-              timerMode === 'pomodoro' && styles.activeTabText,
-              timerMode === 'pomodoro' && { color: '#6C63FF' }
+              { color: theme.textSecondary },
+              timerMode === 'pomodoro' && { color: theme.primary, fontWeight: 'bold' }
             ]}
           >
             Focus
@@ -272,15 +212,15 @@ const TimerScreen = () => {
           style={[
             styles.tab,
             timerMode === 'shortBreak' && styles.activeTab,
-            timerMode === 'shortBreak' && { backgroundColor: '#4CAF5020' }
+            timerMode === 'shortBreak' && { backgroundColor: `${theme.success}20` }
           ]}
           onPress={() => resetTimer('shortBreak')}
         >
           <Text
             style={[
               styles.tabText,
-              timerMode === 'shortBreak' && styles.activeTabText,
-              timerMode === 'shortBreak' && { color: '#4CAF50' }
+              { color: theme.textSecondary },
+              timerMode === 'shortBreak' && { color: theme.success, fontWeight: 'bold' }
             ]}
           >
             Short Break
@@ -298,8 +238,8 @@ const TimerScreen = () => {
           <Text
             style={[
               styles.tabText,
-              timerMode === 'longBreak' && styles.activeTabText,
-              timerMode === 'longBreak' && { color: '#2196F3' }
+              { color: theme.textSecondary },
+              timerMode === 'longBreak' && { color: '#2196F3', fontWeight: 'bold' }
             ]}
           >
             Long Break
@@ -309,11 +249,11 @@ const TimerScreen = () => {
 
       {timerMode === 'pomodoro' && !isRunning && timeLeft === getTotalSeconds() && (
         <View style={styles.subjectContainer}>
-          <Text style={styles.subjectLabel}>What are you focusing on?</Text>
+          <Text style={[styles.subjectLabel, { color: theme.text }]}>What are you focusing on?</Text>
 
           {/* Task selection */}
           <View style={styles.taskContainer}>
-            <Text style={styles.taskLabel}>Select a task:</Text>
+            <Text style={[styles.taskLabel, { color: theme.text }]}>Select a task:</Text>
             <View style={styles.taskList}>
               {tasks
                 .filter(task => !task.completed && !task.archived)
@@ -322,7 +262,8 @@ const TimerScreen = () => {
                     key={task.id}
                     style={[
                       styles.taskTag,
-                      selectedTaskId === task.id && { backgroundColor: '#6C63FF' }
+                      { backgroundColor: theme.card },
+                      selectedTaskId === task.id && { backgroundColor: theme.primary }
                     ]}
                     onPress={() => {
                       setSelectedTaskId(task.id);
@@ -332,6 +273,7 @@ const TimerScreen = () => {
                     <Text
                       style={[
                         styles.taskText,
+                        { color: theme.text },
                         selectedTaskId === task.id && { color: '#FFFFFF' }
                       ]}
                       numberOfLines={1}
@@ -359,8 +301,8 @@ const TimerScreen = () => {
             backgroundColor={`${getTimerColor()}20`}
             showPercentage={false}
           >
-            <Text style={styles.timeText}>{formatTime(timeLeft)}</Text>
-            <Text style={styles.modeText}>
+            <Text style={[styles.timeText, { color: theme.text }]}>{formatTime(timeLeft)}</Text>
+            <Text style={[styles.modeText, { color: theme.textSecondary }]}>
               {timerMode === 'pomodoro' ? 'Focus Time' : timerMode === 'shortBreak' ? 'Short Break' : 'Long Break'}
             </Text>
           </ProgressRing>
@@ -369,10 +311,10 @@ const TimerScreen = () => {
 
       <View style={styles.controls}>
         <TouchableOpacity
-          style={styles.resetButton}
+          style={[styles.resetButton, { backgroundColor: theme.card }]}
           onPress={() => resetTimer(timerMode)}
         >
-          <Ionicons name="refresh" size={24} color="#666" />
+          <Ionicons name="refresh" size={24} color={theme.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -390,15 +332,15 @@ const TimerScreen = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.skipButton}
+          style={[styles.skipButton, { backgroundColor: theme.card }]}
           onPress={() => handleTimerComplete(true)} // Pass true to indicate it was skipped
         >
-          <Ionicons name="play-skip-forward" size={24} color="#666" />
+          <Ionicons name="play-skip-forward" size={24} color={theme.textSecondary} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.infoContainer}>
-        <Text style={styles.infoText}>
+        <Text style={[styles.infoText, { color: theme.textSecondary }]}>
           {timerMode === 'pomodoro'
             ? `Focus for ${settings.pomodoroLength} minutes`
             : timerMode === 'shortBreak'
@@ -414,7 +356,6 @@ const TimerScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0EEFF',
   },
   header: {
     padding: 16,
@@ -425,23 +366,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
   },
   sessionsContainer: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   sessionsText: {
-    color: '#666',
     fontWeight: '500',
   },
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: 16,
     marginVertical: 8,
-    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 4,
   },
@@ -452,16 +389,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   activeTab: {
-    backgroundColor: '#F0EEFF',
+    fontWeight: 'bold',
   },
   tabText: {
     fontSize: 14,
-    color: '#666',
     fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#6C63FF',
-    fontWeight: 'bold',
   },
   subjectContainer: {
     padding: 16,
@@ -469,16 +401,13 @@ const styles = StyleSheet.create({
   subjectLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
   },
-  // Removed subject selection styles
   taskContainer: {
     marginVertical: 8,
   },
   taskLabel: {
     fontSize: 14,
-    color: '#333',
     marginBottom: 8,
   },
   taskList: {
@@ -486,7 +415,6 @@ const styles = StyleSheet.create({
     overflow: 'scroll',
   },
   taskTag: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -495,7 +423,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   taskText: {
-    color: '#333',
     fontSize: 14,
   },
   timerContainer: {
@@ -506,11 +433,9 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#333',
   },
   modeText: {
     fontSize: 16,
-    color: '#666',
     marginTop: 8,
   },
   controls: {
@@ -523,7 +448,6 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 24,
@@ -532,7 +456,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#6C63FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -540,7 +463,6 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 24,
@@ -551,7 +473,6 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
   },
 });

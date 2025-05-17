@@ -1,16 +1,25 @@
+import { useContext } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { useTheme } from '../context/ThemeContext';
 
 const ProgressRing = ({
   progress = 0,
   size = 100,
   strokeWidth = 10,
-  textColor = '#333',
-  progressColor = '#6C63FF',
-  backgroundColor = '#EEEEEE',
+  textColor,
+  progressColor,
+  backgroundColor,
   showPercentage = true,
   children
 }) => {
+  const { theme } = useTheme();
+
+  // Use provided colors or fallback to theme colors
+  const ringTextColor = textColor || theme.text;
+  const ringProgressColor = progressColor || theme.primary;
+  const ringBackgroundColor = backgroundColor || (theme.isDark ? `${theme.primary}30` : '#EEEEEE');
+
   // Calculate values for the SVG
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
@@ -22,7 +31,7 @@ const ProgressRing = ({
       <Svg width={size} height={size}>
         {/* Background Circle */}
         <Circle
-          stroke={backgroundColor}
+          stroke={ringBackgroundColor}
           fill="none"
           strokeWidth={strokeWidth}
           cx={size / 2}
@@ -32,7 +41,7 @@ const ProgressRing = ({
 
         {/* Progress Circle */}
         <Circle
-          stroke={progressColor}
+          stroke={ringProgressColor}
           fill="none"
           strokeWidth={strokeWidth}
           cx={size / 2}
@@ -47,7 +56,7 @@ const ProgressRing = ({
 
       <View style={styles.content}>
         {showPercentage ? (
-          <Text style={[styles.progressText, { color: textColor }]}>
+          <Text style={[styles.progressText, { color: ringTextColor }]}>
             {Math.round(progressValue * 100)}%
           </Text>
         ) : children}
