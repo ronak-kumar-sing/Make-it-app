@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { addDays, format, isPast, isToday, parseISO } from 'date-fns';
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
-const TaskItem = ({ task, onPress, updateTask }) => {
+const TaskItem = ({ task, onPress, updateTask, toggleCompletion }) => {
   const { theme } = useTheme();
   const { title, subject, dueDate, completed, priority, progress, archived } = task;
   const [menuVisible, setMenuVisible] = useState(false);
@@ -38,13 +38,18 @@ const TaskItem = ({ task, onPress, updateTask }) => {
   };
 
   // Toggle task completion
-  const toggleCompletion = () => {
-    const updatedTask = {
-      ...task,
-      completed: !completed,
-      completedAt: !completed ? new Date().toISOString() : null
-    };
-    updateTask(task.id, updatedTask);
+  const handleToggleCompletion = () => {
+    // If a toggleCompletion prop is provided, use it, otherwise fall back to updateTask
+    if (typeof toggleCompletion === 'function') {
+      toggleCompletion();
+    } else {
+      const updatedTask = {
+        ...task,
+        completed: !completed,
+        completedAt: !completed ? new Date().toISOString() : null
+      };
+      updateTask(task.id, updatedTask);
+    }
   };
 
   // Open context menu
@@ -113,14 +118,14 @@ const TaskItem = ({ task, onPress, updateTask }) => {
         delayLongPress={500}
       >
         <View style={styles.checkboxContainer}>
-          <TouchableOpacity onPress={toggleCompletion}>
+          <TouchableOpacity onPress={handleToggleCompletion}>
             <View style={[
               styles.checkbox,
               { borderColor: theme.primary },
               completed && [styles.checkboxChecked, { backgroundColor: theme.primary }]
             ]}>
               {completed && (
-                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                <Ionicons name="checkmark" size={18} color="#FFFFFF" />
               )}
             </View>
           </TouchableOpacity>
@@ -150,7 +155,7 @@ const TaskItem = ({ task, onPress, updateTask }) => {
               style={styles.quickActionButton}
               onPress={openMenu}
             >
-              <Ionicons name="ellipsis-vertical" size={16} color={theme.textSecondary} />
+              <Ionicons name="ellipsis-vertical" size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -224,7 +229,7 @@ const TaskItem = ({ task, onPress, updateTask }) => {
                 style={[styles.modalItem, { borderBottomColor: theme.border }]}
                 onPress={() => handleStatusChange('today')}
               >
-                <Ionicons name="today" size={24} color={theme.primary} />
+                <Ionicons name="today" size={28} color={theme.primary} />
                 <Text style={[styles.modalItemText, { color: theme.text }]}>Move to Today</Text>
               </TouchableOpacity>
 
@@ -232,7 +237,7 @@ const TaskItem = ({ task, onPress, updateTask }) => {
                 style={[styles.modalItem, { borderBottomColor: theme.border }]}
                 onPress={() => handleStatusChange('tomorrow')}
               >
-                <Ionicons name="calendar-outline" size={24} color={theme.primary} />
+                <Ionicons name="calendar-outline" size={28} color={theme.primary} />
                 <Text style={[styles.modalItemText, { color: theme.text }]}>Move to Tomorrow</Text>
               </TouchableOpacity>
 
@@ -240,7 +245,7 @@ const TaskItem = ({ task, onPress, updateTask }) => {
                 style={[styles.modalItem, { borderBottomColor: theme.border }]}
                 onPress={() => handleStatusChange('thisWeek')}
               >
-                <Ionicons name="calendar" size={24} color={theme.primary} />
+                <Ionicons name="calendar" size={28} color={theme.primary} />
                 <Text style={[styles.modalItemText, { color: theme.text }]}>Move to This Week</Text>
               </TouchableOpacity>
 
@@ -248,7 +253,7 @@ const TaskItem = ({ task, onPress, updateTask }) => {
                 style={[styles.modalItem, { borderBottomColor: theme.border }]}
                 onPress={() => handleStatusChange('inProgress')}
               >
-                <Ionicons name="hourglass" size={24} color={theme.warning || '#FF9800'} />
+                <Ionicons name="hourglass" size={28} color={theme.warning || '#FF9800'} />
                 <Text style={[styles.modalItemText, { color: theme.text }]}>Mark as In Progress</Text>
               </TouchableOpacity>
 
@@ -256,7 +261,7 @@ const TaskItem = ({ task, onPress, updateTask }) => {
                 style={[styles.modalItem, { borderBottomColor: theme.border }]}
                 onPress={() => handleStatusChange('highPriority')}
               >
-                <Ionicons name="flag" size={24} color={theme.danger || '#F44336'} />
+                <Ionicons name="flag" size={28} color={theme.danger || '#F44336'} />
                 <Text style={[styles.modalItemText, { color: theme.text }]}>Set High Priority</Text>
               </TouchableOpacity>
 
@@ -265,7 +270,7 @@ const TaskItem = ({ task, onPress, updateTask }) => {
                   style={[styles.modalItem, { borderBottomColor: theme.border }]}
                   onPress={() => handleStatusChange('completed')}
                 >
-                  <Ionicons name="checkmark-circle" size={24} color={theme.success || '#4CAF50'} />
+                  <Ionicons name="checkmark-circle" size={28} color={theme.success || '#4CAF50'} />
                   <Text style={[styles.modalItemText, { color: theme.text }]}>Mark as Completed</Text>
                 </TouchableOpacity>
               ) : (
@@ -273,7 +278,7 @@ const TaskItem = ({ task, onPress, updateTask }) => {
                   style={[styles.modalItem, { borderBottomColor: theme.border }]}
                   onPress={() => handleStatusChange('uncompleted')}
                 >
-                  <Ionicons name="close-circle" size={24} color={theme.danger || '#F44336'} />
+                  <Ionicons name="close-circle" size={28} color={theme.danger || '#F44336'} />
                   <Text style={[styles.modalItemText, { color: theme.text }]}>Mark as Incomplete</Text>
                 </TouchableOpacity>
               )}
@@ -309,9 +314,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 5,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
@@ -398,7 +403,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   quickActionButton: {
-    padding: 5,
+    padding: 8,
     marginLeft: 5,
   },
   // Modal styles
@@ -432,21 +437,22 @@ const styles = StyleSheet.create({
   modalItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
   },
   modalItemText: {
-    fontSize: 16,
+    fontSize: 18,
     marginLeft: 16,
+    fontWeight: '500',
   },
   closeButton: {
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 10,
+    paddingVertical: 14,
     alignItems: 'center',
   },
   closeButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
 });

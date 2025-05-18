@@ -9,15 +9,29 @@ import { useTheme } from '../context/ThemeContext';
 const { width } = Dimensions.get('window');
 
 const AnalyticsScreen = () => {
-  const { stats, subjects } = useContext(AppContext);
+  // Add safe defaults to prevent undefined errors
+  const context = useContext(AppContext);
+  const stats = context?.stats || {
+    totalStudyTime: 0,
+    dailyAverage: 0,
+    tasksCompleted: 0,
+    tasksCreated: 0,
+    pomodoroCompleted: 0,
+    goalProgress: { weeklyStudyTime: 0, weeklyTasksCompleted: 0 },
+    subjectDistribution: {},
+    productivityByHour: {},
+    sessionsCompleted: 0,
+  };
+  const subjects = context?.subjects || [];
   const { theme } = useTheme();
 
   // Prepare data for weekly study time chart
+  const weeklyStudyTime = (stats as any).weeklyStudyTime || [0, 0, 0, 0, 0, 0, 0];
   const weeklyData = {
     labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     datasets: [
       {
-        data: stats.weeklyStudyTime || [0, 0, 0, 0, 0, 0, 0],
+        data: weeklyStudyTime,
       },
     ],
   };
@@ -25,12 +39,12 @@ const AnalyticsScreen = () => {
   // Prepare data for productivity by hour chart
   const hourlyLabels = [];
   const hourlyData = [];
-
+  const productivityByHour = stats.productivityByHour || {};
   for (let i = 0; i < 24; i += 3) {
     hourlyLabels.push(`${i}:00`);
-    const hourSum = (stats.productivityByHour?.[i] || 0) +
-                   (stats.productivityByHour?.[i+1] || 0) +
-                   (stats.productivityByHour?.[i+2] || 0);
+    const hourSum = (productivityByHour[i] || 0) +
+      (productivityByHour[i + 1] || 0) +
+      (productivityByHour[i + 2] || 0);
     hourlyData.push(hourSum);
   }
 
@@ -46,10 +60,10 @@ const AnalyticsScreen = () => {
   // Prepare data for subject distribution pie chart
   const subjectData = [];
   const subjectColors = [];
-
-  if (stats.subjectDistribution) {
-    Object.keys(stats.subjectDistribution).forEach(subjectName => {
-      const minutes = stats.subjectDistribution[subjectName] || 0;
+  const subjectDistribution = stats.subjectDistribution || {};
+  if (subjectDistribution) {
+    Object.keys(subjectDistribution).forEach(subjectName => {
+      const minutes = subjectDistribution[subjectName] || 0;
       if (minutes > 0) {
         subjectData.push({
           name: subjectName,
@@ -62,13 +76,12 @@ const AnalyticsScreen = () => {
       }
     });
   }
-
   // If no subject data, add placeholder
   if (subjectData.length === 0) {
     subjectData.push({
       name: 'No Data',
       minutes: 1,
-      color: theme.isDark ? '#555555' : '#CCCCCC',
+      color: '#CCCCCC',
       legendFontColor: theme.textSecondary,
       legendFontSize: 12,
     });
@@ -92,31 +105,26 @@ const AnalyticsScreen = () => {
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>Analytics</Text>
         </View>
-
         <View style={styles.summaryContainer}>
           <View style={[styles.summaryCard, { backgroundColor: theme.card }]}>
             <Ionicons name="time-outline" size={24} color={theme.primary} />
             <Text style={[styles.summaryValue, { color: theme.text }]}>{(stats.totalStudyTime / 60).toFixed(1)} hrs</Text>
             <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Total Study Time</Text>
           </View>
-
           <View style={[styles.summaryCard, { backgroundColor: theme.card }]}>
             <Ionicons name="checkmark-circle-outline" size={24} color={theme.primary} />
             <Text style={[styles.summaryValue, { color: theme.text }]}>{stats.tasksCompleted}</Text>
             <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Tasks Completed</Text>
           </View>
-
           <View style={[styles.summaryCard, { backgroundColor: theme.card }]}>
             <Ionicons name="timer-outline" size={24} color={theme.primary} />
             <Text style={[styles.summaryValue, { color: theme.text }]}>{stats.sessionsCompleted}</Text>
             <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Focus Sessions</Text>
           </View>
         </View>
-
         <View style={[styles.section, { backgroundColor: theme.card }]}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Weekly Study Time</Text>
           <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>Hours studied each day of the week</Text>
-
           <BarChart
             data={weeklyData}
             width={width - 40}
@@ -125,13 +133,13 @@ const AnalyticsScreen = () => {
             style={styles.chart}
             showValuesOnTopOfBars={true}
             fromZero={true}
+            yAxisLabel={''}
+            yAxisSuffix={'h'}
           />
         </View>
-
         <View style={[styles.section, { backgroundColor: theme.card }]}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Subject Distribution</Text>
           <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>Time spent on each subject</Text>
-
           <PieChart
             data={subjectData}
             width={width - 40}
@@ -144,11 +152,9 @@ const AnalyticsScreen = () => {
             style={styles.chart}
           />
         </View>
-
         <View style={[styles.section, { backgroundColor: theme.card }]}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Productivity by Time of Day</Text>
           <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>When you're most productive</Text>
-
           <BarChart
             data={productivityData}
             width={width - 40}
@@ -157,32 +163,30 @@ const AnalyticsScreen = () => {
             style={styles.chart}
             showValuesOnTopOfBars={true}
             fromZero={true}
+            yAxisLabel={''}
+            yAxisSuffix={'m'}
           />
         </View>
-
         <View style={[styles.section, { backgroundColor: theme.card }]}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Insights</Text>
-
           <View style={[styles.insightCard, { backgroundColor: theme.background }]}>
             <Ionicons name="bulb-outline" size={24} color="#FFC107" />
             <View style={styles.insightContent}>
               <Text style={[styles.insightTitle, { color: theme.text }]}>Best Study Time</Text>
               <Text style={[styles.insightText, { color: theme.textSecondary }]}>
-                {hourlyData.indexOf(Math.max(...hourlyData)) * 3}:00 - {hourlyData.indexOf(Math.max(...hourlyData)) * 3 + 3}:00 is your most productive time.
+                {hourlyData.length > 0 ? `${hourlyData.indexOf(Math.max(...hourlyData)) * 3}:00 - ${hourlyData.indexOf(Math.max(...hourlyData)) * 3 + 3}:00 is your most productive time.` : 'No data.'}
               </Text>
             </View>
           </View>
-
           <View style={[styles.insightCard, { backgroundColor: theme.background }]}>
             <Ionicons name="calendar-outline" size={24} color="#4CAF50" />
             <View style={styles.insightContent}>
               <Text style={[styles.insightTitle, { color: theme.text }]}>Most Productive Day</Text>
               <Text style={[styles.insightText, { color: theme.textSecondary }]}>
-                {weeklyData.labels[stats.weeklyStudyTime.indexOf(Math.max(...stats.weeklyStudyTime))]} is your most productive day of the week.
+                {weeklyData.labels && weeklyStudyTime && weeklyStudyTime.length > 0 ? `${weeklyData.labels[weeklyStudyTime.indexOf(Math.max(...weeklyStudyTime))]} is your most productive day of the week.` : 'No data.'}
               </Text>
             </View>
           </View>
-
           {subjectData.length > 1 && (
             <View style={[styles.insightCard, { backgroundColor: theme.background }]}>
               <Ionicons name="book-outline" size={24} color="#2196F3" />
@@ -195,7 +199,6 @@ const AnalyticsScreen = () => {
             </View>
           )}
         </View>
-
         <View style={styles.privacyNote}>
           <Ionicons name="lock-closed-outline" size={16} color={theme.textSecondary} />
           <Text style={[styles.privacyText, { color: theme.textSecondary }]}>

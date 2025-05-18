@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
 import { useContext } from 'react';
 import {
@@ -15,8 +16,18 @@ import ProgressRing from '../components/ProgressRing';
 import { AppContext } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 
+// Define the navigation param list for type safety
+type RootStackParamList = {
+  Tasks: { screen?: string; params?: any };
+  Timer: undefined;
+  Exams: { params?: { examId: string } };
+  Resources: undefined;
+  Analytics: undefined;
+  Achievements: undefined;
+};
+
 const DashboardScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { theme } = useTheme();
   const {
     tasks,
@@ -80,24 +91,24 @@ const DashboardScreen = () => {
             />
             <Text style={[styles.goalLabel, { color: theme.text }]}>Daily Goal</Text>
             <Text style={[styles.goalText, { color: theme.textSecondary }]}>
-              {(streaks.studyDays?.[format(today, 'yyyy-MM-dd')] || 0) / 60} / {settings.dailyGoalMinutes / 60} hours
+              {((streaks.studyDays?.[format(today, 'yyyy-MM-dd')] || 0) / 60).toFixed(1)} / {(settings.dailyGoalMinutes / 60).toFixed(1)} hrs
             </Text>
           </View>
 
           <View style={[styles.statsContainer, { borderTopColor: theme.border }]}>
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text }]}>{stats.totalStudyTime}</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Total Minutes</Text>
+              <Text style={[styles.statValue, { color: theme.text }]}>{(stats.totalStudyTime / 60).toFixed(1)}</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Study Hours</Text>
             </View>
 
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text }]}>{stats.tasksCompleted}</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Tasks Done</Text>
+              <Text style={[styles.statValue, { color: theme.text }]}>{stats.sessionsCompleted || 0}</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Sessions</Text>
             </View>
 
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text }]}>{streaks.longest}</Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Longest Streak</Text>
+              <Text style={[styles.statValue, { color: theme.text }]}>{stats.dailySessionCount?.[format(today, 'yyyy-MM-dd')] || 0}</Text>
+              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Today's Sessions</Text>
             </View>
           </View>
         </View>
@@ -129,7 +140,7 @@ const DashboardScreen = () => {
                   />
                 </View>
                 <Text style={[styles.goalProgressText, { color: theme.textSecondary }]}>
-                  {(stats.goalProgress?.weeklyStudyTime || 0) / 60} / {(settings.dailyGoalMinutes * 7) / 60} hours
+                  {((stats.goalProgress?.weeklyStudyTime || 0) / 60).toFixed(1)} / {((settings.dailyGoalMinutes * 7) / 60).toFixed(1)} hrs
                 </Text>
               </View>
             </View>

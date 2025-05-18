@@ -32,7 +32,7 @@ const ResourcesScreen = () => {
   // Filter resources based on search query and selected subject
   const filteredResources = resources.filter(resource => {
     const matchesSearch = resource.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (resource.description && resource.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      (resource.description && resource.description.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesSubject = selectedSubject === 'All' || resource.subject === selectedSubject;
 
     return matchesSearch && matchesSubject;
@@ -199,10 +199,10 @@ const ResourcesScreen = () => {
                 item.type === 'document'
                   ? 'document-text'
                   : item.type === 'link'
-                  ? 'link'
-                  : item.aiGenerated
-                  ? 'sparkles'
-                  : 'create'
+                    ? 'link'
+                    : item.aiGenerated
+                      ? 'sparkles'
+                      : 'create'
               }
               size={24}
               color={subjectColor}
@@ -214,7 +214,7 @@ const ResourcesScreen = () => {
           <Text style={[styles.resourceTitle, { color: theme.text }]}>
             {item.title}
             {item.aiGenerated && (
-              <Text style={styles.aiGeneratedBadge}> • AI</Text>
+              <Text style={[styles.aiGeneratedBadge, { color: theme.accent }]}> • AI</Text>
             )}
           </Text>
           {item.description && (
@@ -260,7 +260,7 @@ const ResourcesScreen = () => {
             style={[styles.aiButton, { marginRight: 12, backgroundColor: theme.accent }]}
             onPress={() => setAiGeneratorVisible(true)}
           >
-            <Ionicons name="sparkles" size={22} color="#FFFFFF" />
+            <Ionicons name="sparkles" size={22} color={theme.buttonText} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: theme.primary }]}
@@ -277,12 +277,16 @@ const ResourcesScreen = () => {
               setModalVisible(true);
             }}
           >
-            <Ionicons name="add" size={24} color="#FFFFFF" />
+            <Ionicons name="add" size={24} color={theme.buttonText} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <View style={[styles.searchContainer, { backgroundColor: theme.card }]}>
+      <View style={[styles.searchContainer, {
+        backgroundColor: theme.card,
+        shadowColor: theme.isDark ? '#000000' : '#000000',
+        shadowOpacity: theme.isDark ? 0.2 : 0.1,
+      }]}>
         <Ionicons name="search" size={20} color={theme.textSecondary} style={styles.searchIcon} />
         <TextInput
           style={[styles.searchInput, { color: theme.text }]}
@@ -384,7 +388,7 @@ const ResourcesScreen = () => {
               setModalVisible(true);
             }}
           >
-            <Text style={styles.emptyStateButtonText}>Add Resource</Text>
+            <Text style={[styles.emptyStateButtonText, { color: theme.buttonText }]}>Add Resource</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -396,7 +400,7 @@ const ResourcesScreen = () => {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { backgroundColor: theme.isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)' }]}>
           <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
@@ -425,13 +429,13 @@ const ResourcesScreen = () => {
                     <Ionicons
                       name="create"
                       size={20}
-                      color={newResource.type === 'note' ? '#FFFFFF' : theme.primary}
+                      color={newResource.type === 'note' ? theme.buttonText : theme.primary}
                     />
                     <Text
                       style={[
                         styles.typeText,
                         { color: theme.primary },
-                        newResource.type === 'note' && styles.activeTypeText
+                        newResource.type === 'note' && [styles.activeTypeText, { color: theme.buttonText }]
                       ]}
                     >
                       Note
@@ -449,13 +453,13 @@ const ResourcesScreen = () => {
                     <Ionicons
                       name="document-text"
                       size={20}
-                      color={newResource.type === 'document' ? '#FFFFFF' : theme.primary}
+                      color={newResource.type === 'document' ? theme.buttonText : theme.primary}
                     />
                     <Text
                       style={[
                         styles.typeText,
                         { color: theme.primary },
-                        newResource.type === 'document' && styles.activeTypeText
+                        newResource.type === 'document' && [styles.activeTypeText, { color: theme.buttonText }]
                       ]}
                     >
                       Document
@@ -473,13 +477,13 @@ const ResourcesScreen = () => {
                     <Ionicons
                       name="link"
                       size={20}
-                      color={newResource.type === 'link' ? '#FFFFFF' : theme.primary}
+                      color={newResource.type === 'link' ? theme.buttonText : theme.primary}
                     />
                     <Text
                       style={[
                         styles.typeText,
                         { color: theme.primary },
-                        newResource.type === 'link' && styles.activeTypeText
+                        newResource.type === 'link' && [styles.activeTypeText, { color: theme.buttonText }]
                       ]}
                     >
                       Link
@@ -589,8 +593,8 @@ const ResourcesScreen = () => {
                     setPreviewModalVisible(true);
                   }}
                 >
-                  <Ionicons name="eye-outline" size={20} color="#FFFFFF" />
-                  <Text style={styles.previewButtonText}>Preview</Text>
+                  <Ionicons name="eye-outline" size={20} color={theme.buttonText} />
+                  <Text style={[styles.previewButtonText, { color: theme.buttonText }]}>Preview</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -601,7 +605,7 @@ const ResourcesScreen = () => {
                 ]}
                 onPress={saveResource}
               >
-                <Text style={styles.saveButtonText}>Save Resource</Text>
+                <Text style={[styles.saveButtonText, { color: theme.buttonText }]}>Save Resource</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -623,14 +627,14 @@ const ResourcesScreen = () => {
         visible={previewModalVisible}
         onRequestClose={() => setPreviewModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { backgroundColor: theme.isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)' }]}>
           <View style={[styles.previewModalContent, { backgroundColor: theme.card }]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleContainer}>
                 <Text style={[styles.modalTitle, { color: theme.text }]}>Study Notes</Text>
                 <View style={[styles.previewBadge, { backgroundColor: theme.success }]}>
-                  <Ionicons name="eye-outline" size={14} color="#FFFFFF" />
-                  <Text style={styles.previewBadgeText}>Preview Mode</Text>
+                  <Ionicons name="eye-outline" size={14} color={theme.buttonText} />
+                  <Text style={[styles.previewBadgeText, { color: theme.buttonText }]}>Preview Mode</Text>
                 </View>
               </View>
               <View style={styles.headerButtons}>
@@ -641,8 +645,8 @@ const ResourcesScreen = () => {
                     setModalVisible(true); // Open edit modal
                   }}
                 >
-                  <Ionicons name="create-outline" size={20} color="#FFFFFF" />
-                  <Text style={styles.editButtonText}>Edit</Text>
+                  <Ionicons name="create-outline" size={20} color={theme.buttonText} />
+                  <Text style={[styles.editButtonText, { color: theme.buttonText }]}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.closeButton}

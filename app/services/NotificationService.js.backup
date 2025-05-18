@@ -1,0 +1,349 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+
+// Configure notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+// Notification types
+export const NOTIFICATION_TYPES = {
+  TASK_DUE: 'TASK_DUE',
+  EXAM_REMINDER: 'EXAM_REMINDER',
+  TIMER_COMPLETED: 'TIMER_COMPLETED',
+  DAILY_GOAL: 'DAILY_GOAL',
+  STREAK_REMINDER: 'STREAK_REMINDER',
+  ACHIEVEMENT_UNLOCKED: 'ACHIEVEMENT_UNLOCKED',
+};
+
+// Check if device can receive notifications
+export const areNotificationsAvailable = async () => {
+  if (!Device.isDevice) {
+    return false; // Cannot show notifications on simulator/emulator
+  }
+  return true;
+};
+
+// Request notifications permissions
+export const requestPermissionsAsync = async () => {
+  if (!Device.isDevice) {
+    return { status: 'denied' }; // Cannot request on simulator/emulator
+  }
+
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    // Only ask if permissions have not been determined
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    // Store the permission status
+    await AsyncStorage.setItem('notificationPermission', finalStatus);
+
+    // Return the final status
+    return { status: finalStatus };
+  } catch (err) {
+    console.error('Error requesting notification permissions:', err);
+    return { status: 'denied', error: err };
+  }
+};
+
+// Check if notifications permission has been granted
+export const checkPermissions = async () => {
+  try {
+    if (!Device.isDevice) {
+      return { status: 'denied' }; // Return false on simulator/emulator
+    }
+
+    const { status } = await Notifications.getPermissionsAsync();
+    return { status };
+  } catch (err) {
+    console.error('Error checking notification permissions:', err);
+    return { status: 'denied', error: err };
+  }
+};
+
+// Initialize notifications for the app
+export const initializeNotifications = async (
+  enabled,
+  tasks = [],
+  exams = [],
+  streaks = { current: 0 },
+  dailyStudyTime = 0,
+  dailyGoalMinutes = 120
+) => {
+  // Cancel any existing notifications first
+  await cancelAllNotifications();
+
+  // If notifications are not enabled in settings, don't schedule any
+  if (!enabled) return;
+
+  // Check permissions
+  const { status } = await checkPermissions();
+  if (status !== 'granted') {
+    console.log('Notifications permission not granted');
+    return;
+  }
+
+  // Schedule notifications for upcoming tasks
+  tasks.forEach(task => {
+    if (!task.completed && task.dueDate) {
+      scheduleTaskDueNotification(task);
+    }
+  });
+
+  // Schedule notifications for upcoming exams
+  exams.forEach(exam => {
+    if (!exam.completed && exam.date) {
+      scheduleExamReminder(exam);
+    }
+  });
+
+  // Schedule a streak reminder if there's an active streak
+  if (streaks.current > 0) {
+    scheduleStreakReminder(streaks.current);
+  }
+
+  // Schedule daily goal reminder if behind on daily goal
+  if (dailyStudyTime < dailyGoalMinutes) {
+    scheduleDailyGoalReminder(dailyStudyTime, dailyGoalMinutes);
+  }
+};
+
+// Schedule a notification for task due date
+export const scheduleTaskDueNotification = async (task) => {
+  if (!task.dueDate) return;
+
+  try {
+    const { status } = await checkPermissions();
+    if (status !== 'granted') return;
+
+    const dueDate = new Date(task.dueDate);
+
+    // Don't schedule if the date is in the past
+    if (dueDate < new Date()) return;
+
+    // Schedule notification 1 hour before due date
+    const notificationDate = new Date(dueDate);
+    notificationDate.setHours(notificationDate.getHours() - 1);
+
+    // If the notification time is already in the past, don't schedule
+    if (notificationDate < new Date()) return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Task Reminder',
+        body: `"${task.title}" is due in 1 hour.`,
+        data: { taskId: task.id },
+      },
+      trigger: notificationDate,
+    });
+
+    // Also schedule a notification at the exact due time
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Task Due Now',
+        body: `"${task.title}" is due now.`,
+        data: { taskId: task.id },
+      },
+      trigger: dueDate,
+    });
+  } catch (err) {
+    console.error('Error scheduling task notification:', err);
+  }
+};
+
+// Cancel a specific task notification
+export const cancelTaskNotification = async (taskId) => {
+  try {
+    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+    const taskNotifications = scheduledNotifications.filter(
+      notification => notification.content.data?.taskId === taskId
+    );
+
+    taskNotifications.forEach(async notification => {
+      await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+    });
+  } catch (err) {
+    console.error('Error canceling task notification:', err);
+  }
+};
+
+// Schedule a notification for exam
+export const scheduleExamReminder = async (exam) => {
+  if (!exam.date) return;
+
+  try {
+    const { status } = await checkPermissions();
+    if (status !== 'granted') return;
+
+    const examDate = new Date(exam.date);
+
+    // Don't schedule if the date is in the past
+    if (examDate < new Date()) return;
+
+    // Schedule notification 1 day before exam
+    const dayBeforeDate = new Date(examDate);
+    dayBeforeDate.setDate(dayBeforeDate.getDate() - 1);
+    dayBeforeDate.setHours(9, 0, 0); // 9 AM
+
+    // If the notification time is already in the past, don't schedule
+    if (dayBeforeDate < new Date()) return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Exam Tomorrow',
+        body: `Reminder: Your "${exam.title}" exam is tomorrow.`,
+        data: { examId: exam.id },
+      },
+      trigger: dayBeforeDate,
+    });
+
+    // Also schedule a notification on the morning of exam day
+    const examDayMorning = new Date(examDate);
+    examDayMorning.setHours(7, 0, 0); // 7 AM on exam day
+
+    if (examDayMorning > new Date()) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Exam Today',
+          body: `Your "${exam.title}" exam is today.`,
+          data: { examId: exam.id },
+        },
+        trigger: examDayMorning,
+      });
+    }
+  } catch (err) {
+    console.error('Error scheduling exam notification:', err);
+  }
+};
+
+// Cancel exam notifications
+export const cancelExamReminders = async (examId) => {
+  try {
+    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+    const examNotifications = scheduledNotifications.filter(
+      notification => notification.content.data?.examId === examId
+    );
+
+    examNotifications.forEach(async notification => {
+      await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+    });
+  } catch (err) {
+    console.error('Error canceling exam notifications:', err);
+  }
+};
+
+// Schedule a notification for maintaining streak
+export const scheduleStreakReminder = async (streakDays) => {
+  try {
+    const { status } = await checkPermissions();
+    if (status !== 'granted') return;
+
+    // Calculate tomorrow evening at 6 PM
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(18, 0, 0, 0);
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Maintain Your Study Streak!',
+        body: `Don't break your ${streakDays}-day study streak. Add a study session today!`,
+      },
+      trigger: tomorrow,
+    });
+  } catch (err) {
+    console.error('Error scheduling streak reminder:', err);
+  }
+};
+
+// Schedule a reminder for daily study goal
+export const scheduleDailyGoalReminder = async (currentMinutes, goalMinutes) => {
+  try {
+    const { status } = await checkPermissions();
+    if (status !== 'granted') return;
+
+    // Calculate evening reminder (8 PM today)
+    const evening = new Date();
+    evening.setHours(20, 0, 0, 0);
+
+    // If it's already past 8 PM, don't schedule
+    if (evening < new Date()) return;
+
+    const remainingMinutes = goalMinutes - currentMinutes;
+    const remainingHours = (remainingMinutes / 60).toFixed(1);
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Daily Study Goal Reminder',
+        body: `You still need to study ${remainingHours} hours to reach your daily goal.`,
+      },
+      trigger: evening,
+    });
+  } catch (err) {
+    console.error('Error scheduling daily goal reminder:', err);
+  }
+};
+
+// Send an immediate notification when timer completes
+export const sendTimerCompletionNotification = async (title = 'Timer Complete', body = 'Your study session is complete.') => {
+  try {
+    const { status } = await checkPermissions();
+    if (status !== 'granted') return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body },
+      trigger: null, // Immediate notification
+    });
+  } catch (err) {
+    console.error('Error sending timer completion notification:', err);
+  }
+};
+
+// Send an achievement notification
+export const sendAchievementNotification = async (achievementName) => {
+  try {
+    const { status } = await checkPermissions();
+    if (status !== 'granted') return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Achievement Unlocked! 🏆',
+        body: `You've unlocked the "${achievementName}" achievement!`,
+      },
+      trigger: null, // Immediate notification
+    });
+  } catch (err) {
+    console.error('Error sending achievement notification:', err);
+  }
+};
+
+// Cancel all scheduled notifications
+export const cancelAllNotifications = async () => {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch (err) {
+    console.error('Error canceling all notifications:', err);
+  }
+};
+
+// Register for push notifications
+export const registerForPushNotificationsAsync = async () => {
+  // This function is for Expo Push Notifications service
+  // For local notifications, use requestPermissionsAsync() instead
+  console.log("Push notifications feature would need Expo push token setup");
+};
+
+// Add a listener for notification responses
+export const addNotificationResponseReceivedListener = (callback) => {
+  return Notifications.addNotificationResponseReceivedListener(callback);
+};

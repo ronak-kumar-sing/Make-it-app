@@ -18,7 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 const TasksScreen = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const { tasks, updateTask, settings } = useContext(AppContext);
+  const { tasks, updateTask, toggleTaskCompletion, settings } = useContext(AppContext);
   const [filter, setFilter] = useState('all');
 
   // Get enabled filters from settings
@@ -292,6 +292,7 @@ const TasksScreen = () => {
                   task={task}
                   onPress={() => navigation.navigate('TaskDetail', { taskId: task.id })}
                   updateTask={updateTask}
+                  toggleCompletion={() => toggleTaskCompletion(task.id)}
                   theme={theme}
                 />
               ))}

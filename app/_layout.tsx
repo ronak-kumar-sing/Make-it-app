@@ -4,8 +4,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initializeAndroidNotifications } from './services/AndroidNotificationFixes';
+import { verifyDataIntegrity } from './utils/DataIntegrity';
 
 // Screens
 import AchievementsScreen from './screens/AchievementsScreen';
@@ -22,6 +25,8 @@ import TasksScreen from './screens/TasksScreen';
 import TimerScreen from './screens/TimerScreen';
 
 // Context
+import DataSyncProvider from './components/DataSyncProvider';
+import NotificationInitializer from './components/NotificationInitializer';
 import { AppProvider } from './context/AppContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 
@@ -151,14 +156,32 @@ export default function App() {
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('alreadyLaunched').then(value => {
-      if (value === null) {
-        AsyncStorage.setItem('alreadyLaunched', 'true');
-        setIsFirstLaunch(true);
-      } else {
-        setIsFirstLaunch(false);
+    // Check if this is the first launch and also verify data integrity
+    async function initApp() {
+      try {
+        // First check if this is the first launch
+        const value = await AsyncStorage.getItem('alreadyLaunched');
+        if (value === null) {
+          await AsyncStorage.setItem('alreadyLaunched', 'true');
+          setIsFirstLaunch(true);
+        } else {
+          setIsFirstLaunch(false);
+        }
+
+        // Then verify and fix any data integrity issues
+        await verifyDataIntegrity();
+
+        // Set up Android notification channels if on Android
+        if (Platform.OS === 'android') {
+          await initializeAndroidNotifications();
+        }
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        setIsFirstLaunch(false); // Default to false if there's an error
       }
-    });
+    }
+
+    initApp();
   }, []);
 
   if (isFirstLaunch === null) {
@@ -171,12 +194,16 @@ export default function App() {
         <AppThemeWrapper>
           <SafeAreaProvider>
             <AppProvider>
-              <Stack.Navigator screenOptions={{ headerShown: false }}>
-                {isFirstLaunch ? (
-                  <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-                ) : null}
-                <Stack.Screen name="Main" component={MainTabs} />
-              </Stack.Navigator>
+              <DataSyncProvider>
+                {/* Add NotificationInitializer to initialize and handle notifications */}
+                <NotificationInitializer />
+                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                  {isFirstLaunch ? (
+                    <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                  ) : null}
+                  <Stack.Screen name="Main" component={MainTabs} />
+                </Stack.Navigator>
+              </DataSyncProvider>
             </AppProvider>
           </SafeAreaProvider>
         </AppThemeWrapper>

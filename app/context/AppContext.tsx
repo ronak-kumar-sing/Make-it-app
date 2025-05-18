@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { differenceInDays, format } from 'date-fns';
 import React, { createContext, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { Alert, AppState } from 'react-native';
+import { Alert, AppState as RNAppState } from 'react-native';
+import * as NotificationService from '../services/NotificationService';
+import { syncSettingsToStorage } from '../utils/StorageSync';
 
 // Define types
 type Task = {
@@ -100,6 +102,15 @@ type Achievement = {
   progress: Record<string, number>;
 };
 
+type TimerSession = {
+  id?: string;
+  timestamp: string;
+  duration: number; // in minutes
+  subject?: string;
+  taskId?: string;
+  isComplete: boolean;
+};
+
 type Stats = {
   totalStudyTime: number;
   dailyAverage: number;
@@ -116,6 +127,8 @@ type Stats = {
   subjectDistribution?: Record<string, number>;
   productivityByHour?: Record<string, number>;
   sessionsCompleted?: number;
+  recentSessions?: TimerSession[]; // Store recent timer sessions
+  dailySessionCount?: Record<string, number>; // Store daily session counts
 };
 
 // Define state type
@@ -146,7 +159,7 @@ type AppAction =
   | { type: 'UPDATE_TASK'; payload: { id: string; updates: Partial<Task> } }
   | { type: 'DELETE_TASK'; payload: string }
   | { type: 'TOGGLE_TASK_COMPLETION'; payload: string }
-  | { type: 'RECORD_STUDY_SESSION'; payload: { minutes: number; subject?: string; taskId?: string } }
+  | { type: 'RECORD_STUDY_SESSION'; payload: { minutes: number; subject?: string; taskId?: string; sessionData?: TimerSession } }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<Settings> }
   | { type: 'ARCHIVE_OLD_TASKS'; payload: number };
 
@@ -199,9 +212,13 @@ const initialState: AppState = {
     tasksCompleted: 0,
     tasksCreated: 0,
     pomodoroCompleted: 0,
+    sessionsCompleted: 0,
+    dailySessionCount: {},
+    recentSessions: [],
     goalProgress: {
       weeklyStudyTime: 0,
-      weeklyTasksCompleted: 0
+      weeklyTasksCompleted: 0,
+      dailyStudyTime: 0
     }
   },
   subjects: [
@@ -331,7 +348,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
     case 'RECORD_STUDY_SESSION': {
-      const { minutes, subject, taskId } = action.payload;
+      const { minutes, subject, taskId, sessionData } = action.payload;
       const today = format(new Date(), 'yyyy-MM-dd');
       const now = new Date();
       const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
@@ -356,8 +373,36 @@ function appReducer(state: AppState, action: AppAction): AppState {
         updatedStats.subjectDistribution = subjectDistribution;
       }
 
+      // Track pomodoro completion
+      updatedStats.pomodoroCompleted = (updatedStats.pomodoroCompleted || 0) + 1;
+
+      // Update total study time and sessions count
       updatedStats.totalStudyTime = updatedStats.totalStudyTime + minutes;
       updatedStats.sessionsCompleted = (updatedStats.sessionsCompleted || 0) + 1;
+
+      // Update daily session count
+      const dailySessionCount = { ...(updatedStats.dailySessionCount || {}) };
+      dailySessionCount[today] = (dailySessionCount[today] || 0) + 1;
+      updatedStats.dailySessionCount = dailySessionCount;
+
+      // Store session data for recent sessions
+      if (sessionData) {
+        const session = {
+          id: Date.now().toString(),
+          timestamp: sessionData.timestamp || now.toISOString(),
+          duration: minutes,
+          subject: subject,
+          taskId: taskId,
+          isComplete: sessionData.isComplete || true
+        };
+
+        // Keep only the most recent sessions (last 30)
+        const recentSessions = [...(updatedStats.recentSessions || [])];
+        recentSessions.unshift(session);
+        updatedStats.recentSessions = recentSessions.slice(0, 30);
+      }
+
+      // Update goal progress
       updatedStats.goalProgress = {
         ...updatedStats.goalProgress,
         dailyStudyTime: (updatedStats.goalProgress.dailyStudyTime || 0) + minutes,
@@ -497,7 +542,7 @@ type AppContextType = {
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   toggleTaskCompletion: (id: string) => void;
-  recordStudySession: (minutes: number, subject?: string, taskId?: string) => void;
+  recordStudySession: (minutes: number, subject?: string, taskId?: string, sessionData?: TimerSession) => void;
   addExam: (exam: Omit<Exam, 'id' | 'createdAt' | 'completed'>) => void;
   updateExam: (id: string, updates: Partial<Exam>) => void;
   deleteExam: (id: string) => void;
@@ -524,54 +569,131 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const tasksData = await AsyncStorage.getItem('tasks');
-        const streaksData = await AsyncStorage.getItem('streaks');
-        const settingsData = await AsyncStorage.getItem('settings');
-        const statsData = await AsyncStorage.getItem('stats');
-        const subjectsData = await AsyncStorage.getItem('subjects');
-        const resourcesData = await AsyncStorage.getItem('resources');
-        const examsData = await AsyncStorage.getItem('exams');
-        const achievementsData = await AsyncStorage.getItem('achievements');
-        const lastBackupData = await AsyncStorage.getItem('lastBackup');
+        // Load all data items in parallel to speed up startup
+        const [
+          tasksData,
+          streaksData,
+          settingsData,
+          statsData,
+          subjectsData,
+          resourcesData,
+          examsData,
+          achievementsData,
+          lastBackupData
+        ] = await Promise.all([
+          AsyncStorage.getItem('tasks'),
+          AsyncStorage.getItem('streaks'),
+          AsyncStorage.getItem('settings'),
+          AsyncStorage.getItem('stats'),
+          AsyncStorage.getItem('subjects'),
+          AsyncStorage.getItem('resources'),
+          AsyncStorage.getItem('exams'),
+          AsyncStorage.getItem('achievements'),
+          AsyncStorage.getItem('lastBackup')
+        ]);
 
-        if (tasksData) dispatch({ type: 'SET_TASKS', payload: JSON.parse(tasksData) });
-        if (streaksData) dispatch({ type: 'SET_STREAKS', payload: JSON.parse(streaksData) });
-        if (settingsData) dispatch({ type: 'SET_SETTINGS', payload: JSON.parse(settingsData) });
-
-        if (statsData) {
-          const parsedStats = JSON.parse(statsData);
-          // Ensure goalProgress is always initialized
-          if (!parsedStats.goalProgress) {
-            parsedStats.goalProgress = {
-              dailyStudyTime: 0,
-              weeklyStudyTime: 0,
-              weeklyTasksCompleted: 0
-            };
-          }
-          dispatch({ type: 'SET_STATS', payload: parsedStats });
+        // Process each data type with its own try-catch to handle corrupted data
+        try {
+          if (tasksData) dispatch({ type: 'SET_TASKS', payload: JSON.parse(tasksData) });
+        } catch (e) {
+          console.error('Error parsing tasks data:', e);
         }
 
-        if (subjectsData) dispatch({ type: 'SET_SUBJECTS', payload: JSON.parse(subjectsData) });
-        if (resourcesData) dispatch({ type: 'SET_RESOURCES', payload: JSON.parse(resourcesData) });
-        if (examsData) dispatch({ type: 'SET_EXAMS', payload: JSON.parse(examsData) });
-        if (achievementsData) dispatch({ type: 'SET_ACHIEVEMENTS', payload: JSON.parse(achievementsData) });
-        if (lastBackupData) dispatch({ type: 'SET_LAST_BACKUP', payload: JSON.parse(lastBackupData) });
+        try {
+          if (streaksData) dispatch({ type: 'SET_STREAKS', payload: JSON.parse(streaksData) });
+        } catch (e) {
+          console.error('Error parsing streaks data:', e);
+        }
 
-        // Auto-archive old tasks if enabled
+        try {
+          if (settingsData) {
+            const parsedSettings = JSON.parse(settingsData);
+            // Ensure settings have all required properties
+            if (!parsedSettings.goalProgress) {
+              parsedSettings.goalProgress = {
+                dailyStudyTime: 0,
+                weeklyStudyTime: 0,
+                weeklyTasksCompleted: 0
+              };
+            }
+            dispatch({ type: 'SET_SETTINGS', payload: parsedSettings });
+          }
+        } catch (e) {
+          console.error('Error parsing settings data:', e);
+        }
+
+        try {
+          if (statsData) {
+            const parsedStats = JSON.parse(statsData);
+            // Ensure goalProgress is always initialized
+            if (!parsedStats.goalProgress) {
+              parsedStats.goalProgress = {
+                dailyStudyTime: 0,
+                weeklyStudyTime: 0,
+                weeklyTasksCompleted: 0
+              };
+            }
+            // Ensure we have the sessions arrays
+            if (!parsedStats.recentSessions) {
+              parsedStats.recentSessions = [];
+            }
+            if (!parsedStats.dailySessionCount) {
+              parsedStats.dailySessionCount = {};
+            }
+            dispatch({ type: 'SET_STATS', payload: parsedStats });
+          }
+        } catch (e) {
+          console.error('Error parsing stats data:', e);
+        }
+
+        try {
+          if (subjectsData) dispatch({ type: 'SET_SUBJECTS', payload: JSON.parse(subjectsData) });
+        } catch (e) {
+          console.error('Error parsing subjects data:', e);
+        }
+
+        try {
+          if (resourcesData) dispatch({ type: 'SET_RESOURCES', payload: JSON.parse(resourcesData) });
+        } catch (e) {
+          console.error('Error parsing resources data:', e);
+        }
+
+        try {
+          if (examsData) dispatch({ type: 'SET_EXAMS', payload: JSON.parse(examsData) });
+        } catch (e) {
+          console.error('Error parsing exams data:', e);
+        }
+
+        try {
+          if (achievementsData) dispatch({ type: 'SET_ACHIEVEMENTS', payload: JSON.parse(achievementsData) });
+        } catch (e) {
+          console.error('Error parsing achievements data:', e);
+        }
+
+        try {
+          if (lastBackupData) dispatch({ type: 'SET_LAST_BACKUP', payload: JSON.parse(lastBackupData) });
+        } catch (e) {
+          console.error('Error parsing lastBackup data:', e);
+        }
+
+        // Auto-archive old tasks if enabled (do this after data is loaded)
         if (state.settings.autoArchive) {
           archiveOldTasks();
         }
+
+        console.log('Data loaded from AsyncStorage');
       } catch (error) {
         console.error('Error loading data from storage:', error);
       }
     };
 
+    // Load data once on component mount
     loadData();
 
-    // Listen for app state changes
-    const subscription = AppState.addEventListener('change', nextAppState => {
+    // Listen for app state changes to reload data when app comes to foreground
+    const subscription = RNAppState.addEventListener('change', (nextAppState: string) => {
       if (nextAppState === 'active') {
-        // App has come to the foreground
+        console.log('App came to foreground, reloading data');
         loadData();
       }
     });
@@ -583,22 +705,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Save data to AsyncStorage whenever it changes
   useEffect(() => {
+    // Use a debounce to prevent too many writes to AsyncStorage
+    let saveTimeout: ReturnType<typeof setTimeout> | undefined;
+
     const saveData = async () => {
       try {
-        await AsyncStorage.setItem('tasks', JSON.stringify(state.tasks));
-        await AsyncStorage.setItem('streaks', JSON.stringify(state.streaks));
-        await AsyncStorage.setItem('settings', JSON.stringify(state.settings));
-        await AsyncStorage.setItem('stats', JSON.stringify(state.stats));
-        await AsyncStorage.setItem('subjects', JSON.stringify(state.subjects));
-        await AsyncStorage.setItem('resources', JSON.stringify(state.resources));
-        await AsyncStorage.setItem('exams', JSON.stringify(state.exams));
-        await AsyncStorage.setItem('achievements', JSON.stringify(state.achievements));
+        // Save each piece of state in separate try-catch blocks to ensure
+        // one failure doesn't prevent others from saving
+        try {
+          await AsyncStorage.setItem('tasks', JSON.stringify(state.tasks));
+        } catch (e) {
+          console.error('Error saving tasks:', e);
+        }
+
+        try {
+          await AsyncStorage.setItem('streaks', JSON.stringify(state.streaks));
+        } catch (e) {
+          console.error('Error saving streaks:', e);
+        }
+
+        try {
+          await AsyncStorage.setItem('settings', JSON.stringify(state.settings));
+        } catch (e) {
+          console.error('Error saving settings:', e);
+        }
+
+        try {
+          await AsyncStorage.setItem('stats', JSON.stringify(state.stats));
+        } catch (e) {
+          console.error('Error saving stats:', e);
+        }
+
+        try {
+          await AsyncStorage.setItem('subjects', JSON.stringify(state.subjects));
+        } catch (e) {
+          console.error('Error saving subjects:', e);
+        }
+
+        try {
+          await AsyncStorage.setItem('resources', JSON.stringify(state.resources));
+        } catch (e) {
+          console.error('Error saving resources:', e);
+        }
+
+        try {
+          await AsyncStorage.setItem('exams', JSON.stringify(state.exams));
+        } catch (e) {
+          console.error('Error saving exams:', e);
+        }
+
+        try {
+          await AsyncStorage.setItem('achievements', JSON.stringify(state.achievements));
+        } catch (e) {
+          console.error('Error saving achievements:', e);
+        }
+
+        console.log('All data saved to AsyncStorage');
       } catch (error) {
-        console.error('Error saving data to storage:', error);
+        console.error('Error in saveData:', error);
       }
     };
 
-    saveData();
+    // Clear previous timeout
+    clearTimeout(saveTimeout);
+
+    // Set a new timeout to debounce multiple state changes
+    saveTimeout = setTimeout(saveData, 500);
+
+    return () => {
+      clearTimeout(saveTimeout);
+    };
   }, [state]);
 
   // Update goal progress whenever relevant data changes
@@ -618,19 +794,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     dispatch({ type: 'ADD_TASK', payload: newTask });
 
+    // Schedule notification for task due date if notifications are enabled
+    if (state.settings.notifications && newTask.dueDate) {
+      NotificationService.scheduleTaskDueNotification(newTask);
+    }
+
     // Check for achievements
     checkAchievements('task_created');
-  }, []);
+  }, [state.settings.notifications]);
 
   // Update an existing task
   const updateTask = useCallback((id: string, updatedTask: Partial<Task>) => {
     dispatch({ type: 'UPDATE_TASK', payload: { id, updates: updatedTask } });
-  }, []);
+
+    // Handle notifications for updated task
+    if (state.settings.notifications) {
+      const existingTask = state.tasks.find(task => task.id === id);
+      if (existingTask) {
+        const mergedTask = { ...existingTask, ...updatedTask };
+
+        // If the due date changed or completion status changed, update notifications
+        if (updatedTask.dueDate || updatedTask.completed !== undefined) {
+          // Cancel existing notification
+          NotificationService.cancelTaskNotification(id);
+
+          // If task is not completed and has a due date, schedule a new notification
+          if (!mergedTask.completed && mergedTask.dueDate) {
+            NotificationService.scheduleTaskDueNotification(mergedTask);
+          }
+        }
+      }
+    }
+  }, [state.settings.notifications, state.tasks]);
 
   // Delete a task
   const deleteTask = useCallback((id: string) => {
+    // Cancel any notifications for this task
+    if (state.settings.notifications) {
+      NotificationService.cancelTaskNotification(id);
+    }
+
     dispatch({ type: 'DELETE_TASK', payload: id });
-  }, []);
+  }, [state.settings.notifications]);
 
   // Toggle task completion
   const toggleTaskCompletion = useCallback((id: string) => {
@@ -644,15 +849,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [state.tasks]);
 
   // Record study session
-  const recordStudySession = useCallback((minutes: number, subject?: string, taskId?: string) => {
-    dispatch({
-      type: 'RECORD_STUDY_SESSION',
-      payload: { minutes, subject, taskId }
-    });
+  const recordStudySession = useCallback(
+    (minutes: number, subject?: string, taskId?: string, sessionData?: TimerSession) => {
+      // Create a valid session data object if not provided
+      const validSessionData: TimerSession = sessionData || {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        duration: minutes,
+        subject: subject,
+        taskId: taskId,
+        isComplete: true
+      };
 
-    // Check for achievements
-    checkAchievements('study_session', minutes);
-  }, []);
+      // Import the storage utility functions at the top of the file - this will be needed!
+      const { addTimerSession } = require('../utils/StorageSync');
+
+      // Execute the AsyncStorage save using the utility function
+      addTimerSession(validSessionData).catch((error: Error) =>
+        console.error('Error saving timer session:', error)
+      );
+
+      // Dispatch to context state
+      dispatch({
+        type: 'RECORD_STUDY_SESSION',
+        payload: { minutes, subject, taskId, sessionData: validSessionData }
+      });
+
+      // Schedule daily goal reminder if behind on goal and notifications are enabled
+      if (state.settings.notifications) {
+        const currentDailyStudyTime = (state.stats.goalProgress.dailyStudyTime || 0) + minutes;
+        const goalMinutes = state.settings.dailyGoalMinutes;
+
+        if (currentDailyStudyTime < goalMinutes) {
+          // We're still behind on the daily goal, schedule a reminder
+          NotificationService.scheduleDailyGoalReminder(
+            currentDailyStudyTime,
+            goalMinutes
+          );
+        }
+
+        // Schedule streak reminder if there's an active streak
+        const updatedStreak = state.streaks.current > 0 ? state.streaks.current : 1;
+        NotificationService.scheduleStreakReminder(updatedStreak);
+      }
+
+      // Check for achievements
+      checkAchievements('study_session', minutes);
+    },
+    []
+  );
 
   // Add a new exam
   const addExam = useCallback((exam: Omit<Exam, 'id' | 'createdAt' | 'completed'>) => {
@@ -665,22 +910,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updatedExams = [...state.exams, newExam];
     dispatch({ type: 'SET_EXAMS', payload: updatedExams });
-  }, [state.exams]);
+
+    // Schedule exam notifications if enabled
+    if (state.settings.notifications && newExam.date) {
+      NotificationService.scheduleExamReminder(newExam);
+    }
+  }, [state.exams, state.settings.notifications]);
 
   // Update an existing exam
   const updateExam = useCallback((id: string, updatedExam: Partial<Exam>) => {
+    const existingExam = state.exams.find(exam => exam.id === id);
     const updatedExams = state.exams.map(exam =>
       exam.id === id ? { ...exam, ...updatedExam } : exam
     );
 
     dispatch({ type: 'SET_EXAMS', payload: updatedExams });
-  }, [state.exams]);
+
+    // Handle notifications for updated exam
+    if (state.settings.notifications && existingExam) {
+      const mergedExam = { ...existingExam, ...updatedExam };
+
+      // If the date changed or completion status changed, update notifications
+      if (updatedExam.date || updatedExam.time || updatedExam.completed !== undefined) {
+        // Cancel existing notification
+        NotificationService.cancelExamReminders(id);
+
+        // If exam is not completed and has a date, schedule a new notification
+        if (!mergedExam.completed && mergedExam.date) {
+          NotificationService.scheduleExamReminder(mergedExam);
+        }
+      }
+    }
+  }, [state.exams, state.settings.notifications]);
 
   // Delete an exam
   const deleteExam = useCallback((id: string) => {
+    // Cancel any notifications for this exam
+    if (state.settings.notifications) {
+      NotificationService.cancelExamReminders(id);
+    }
+
     const updatedExams = state.exams.filter(exam => exam.id !== id);
     dispatch({ type: 'SET_EXAMS', payload: updatedExams });
-  }, [state.exams]);
+  }, [state.exams, state.settings.notifications]);
 
   // Add a new study resource
   const addResource = useCallback((resource: Omit<Resource, 'id' | 'createdAt'>) => {
@@ -737,8 +1009,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Update settings
   const updateSettings = useCallback((newSettings: Partial<Settings>) => {
+    // Handle notification system changes
+    if (newSettings.notifications !== undefined && newSettings.notifications !== state.settings.notifications) {
+      if (newSettings.notifications) {
+        // Initialize notifications
+        NotificationService.initializeNotifications(
+          true,
+          state.tasks,
+          state.exams,
+          state.streaks,
+          state.stats.goalProgress.dailyStudyTime || 0,
+          state.settings.dailyGoalMinutes
+        );
+      } else {
+        // Cancel all notifications
+        NotificationService.cancelAllNotifications();
+      }
+    }
+
     dispatch({ type: 'UPDATE_SETTINGS', payload: newSettings });
-  }, []);
+
+    // Immediately sync settings to AsyncStorage to ensure persistence
+    setTimeout(() => {
+      syncSettingsToStorage({ ...state.settings, ...newSettings }).catch((error: Error) =>
+        console.error('Error syncing settings after update:', error)
+      );
+    }, 0);
+  }, [state.settings, state.tasks, state.exams, state.streaks, state.stats.goalProgress.dailyStudyTime]);
 
   // Archive old tasks
   const archiveOldTasks = useCallback((days?: number) => {
@@ -901,12 +1198,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (shouldUnlock) {
         newAchievements.unlocked.push(achievementId);
 
-        // Show notification
+        // Format achievement name for display
+        const achievementName = achievementId
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, char => char.toUpperCase());
+
+        // Show in-app notification
         Alert.alert(
-          'Achievement Unlocked!',
-          `You've unlocked the ${achievementId.replace(/_/g, ' ')} achievement!`,
+          'Achievement Unlocked! 🏆',
+          `You've unlocked the "${achievementName}" achievement!`,
           [{ text: 'OK' }]
         );
+
+        // Send system notification if enabled
+        if (state.settings.notifications) {
+          NotificationService.sendAchievementNotification(achievementName);
+        }
       }
     });
 

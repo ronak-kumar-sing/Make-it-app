@@ -4,9 +4,9 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import apiKeys from '../config/apiKeys.js';
 
-const API_KEY = apiKeys.GEMINI_API_KEY;
+
+const API_KEY = 'AIzaSyAr-3cbGf4Iz_c9z1Mn5ax0bbbLYERmpOM';
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 // Available models for fallback strategy

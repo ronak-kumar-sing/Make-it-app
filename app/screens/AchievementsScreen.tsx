@@ -9,6 +9,10 @@ const AchievementsScreen = () => {
   const { achievements, stats, streaks } = useContext(AppContext);
   const { theme } = useTheme();
 
+  // Handle case where achievements may not be initialized
+  const unlockedAchievements = achievements?.unlocked || [];
+  const achievementProgress = achievements?.progress || {};
+
   // Define all achievements
   const achievementsList = [
     {
@@ -17,7 +21,7 @@ const AchievementsScreen = () => {
       description: 'Maintain a study streak for 3 consecutive days',
       icon: 'flame',
       color: '#FF9800',
-      progress: achievements.progress?.streak_3 || 0,
+      progress: achievementProgress.streak_3 || streaks.current || 0,
       threshold: 3,
     },
     {
@@ -26,7 +30,7 @@ const AchievementsScreen = () => {
       description: 'Maintain a study streak for 7 consecutive days',
       icon: 'flame',
       color: '#FF9800',
-      progress: achievements.progress?.streak_7 || 0,
+      progress: achievementProgress.streak_7 || streaks.current || 0,
       threshold: 7,
     },
     {
@@ -35,7 +39,7 @@ const AchievementsScreen = () => {
       description: 'Maintain a study streak for 14 consecutive days',
       icon: 'flame',
       color: '#FF9800',
-      progress: achievements.progress?.streak_14 || 0,
+      progress: achievementProgress.streak_14 || streaks.current || 0,
       threshold: 14,
     },
     {
@@ -44,7 +48,7 @@ const AchievementsScreen = () => {
       description: 'Maintain a study streak for 30 consecutive days',
       icon: 'flame',
       color: '#FF9800',
-      progress: achievements.progress?.streak_30 || 0,
+      progress: achievementProgress.streak_30 || streaks.current || 0,
       threshold: 30,
     },
     {
@@ -53,7 +57,7 @@ const AchievementsScreen = () => {
       description: 'Complete a total of 10 hours of focused study time',
       icon: 'time',
       color: '#2196F3',
-      progress: stats.totalStudyTime,
+      progress: achievementProgress.study_time_10h || stats.totalStudyTime || 0,
       threshold: 600, // 10 hours in minutes
     },
     {
@@ -62,7 +66,7 @@ const AchievementsScreen = () => {
       description: 'Complete a total of 50 hours of focused study time',
       icon: 'time',
       color: '#2196F3',
-      progress: stats.totalStudyTime,
+      progress: achievementProgress.study_time_50h || stats.totalStudyTime || 0,
       threshold: 3000, // 50 hours in minutes
     },
     {
@@ -71,7 +75,7 @@ const AchievementsScreen = () => {
       description: 'Complete 50 study tasks',
       icon: 'checkmark-circle',
       color: '#4CAF50',
-      progress: stats.tasksCompleted,
+      progress: achievementProgress.tasks_completed_50 || stats.tasksCompleted || 0,
       threshold: 50,
     },
     {
@@ -80,7 +84,7 @@ const AchievementsScreen = () => {
       description: 'Complete 100 study tasks',
       icon: 'checkmark-circle',
       color: '#4CAF50',
-      progress: stats.tasksCompleted,
+      progress: achievementProgress.tasks_completed_100 || stats.tasksCompleted || 0,
       threshold: 100,
     },
     {
@@ -89,7 +93,7 @@ const AchievementsScreen = () => {
       description: 'Complete 20 focus sessions',
       icon: 'timer',
       color: '#9C27B0',
-      progress: stats.sessionsCompleted,
+      progress: achievementProgress.sessions_completed_20 || stats.sessionsCompleted || 0,
       threshold: 20,
     },
     {
@@ -98,7 +102,7 @@ const AchievementsScreen = () => {
       description: 'Complete 50 focus sessions',
       icon: 'timer',
       color: '#9C27B0',
-      progress: stats.sessionsCompleted,
+      progress: achievementProgress.sessions_completed_50 || stats.sessionsCompleted || 0,
       threshold: 50,
     },
   ];
@@ -129,8 +133,8 @@ const AchievementsScreen = () => {
 
   // Calculate achievement stats
   const totalAchievements = achievementsList.length;
-  const unlockedAchievements = achievements.unlocked?.length || 0;
-  const achievementPercentage = Math.round((unlockedAchievements / totalAchievements) * 100);
+  const unlockedCount = achievements?.unlocked?.length || 0;
+  const achievementPercentage = Math.round((unlockedCount / totalAchievements) * 100);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -139,7 +143,11 @@ const AchievementsScreen = () => {
           <Text style={[styles.title, { color: theme.text }]}>Achievements</Text>
         </View>
 
-        <View style={[styles.statsContainer, { backgroundColor: theme.card }]}>
+        <View style={[styles.statsContainer, {
+          backgroundColor: theme.card,
+          shadowColor: theme.isDark ? '#000000' : '#000000',
+          shadowOpacity: theme.isDark ? 0.2 : 0.1,
+        }]}>
           <View style={styles.progressContainer}>
             <View style={[styles.progressCircle, { backgroundColor: theme.primaryLight }]}>
               <Text style={[styles.progressText, { color: theme.primary }]}>{achievementPercentage}%</Text>
@@ -149,23 +157,27 @@ const AchievementsScreen = () => {
 
           <View style={styles.statsDetails}>
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text }]}>{unlockedAchievements}</Text>
+              <Text style={[styles.statValue, { color: theme.text }]}>{unlockedCount}</Text>
               <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Unlocked</Text>
             </View>
 
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.text }]}>{totalAchievements - unlockedAchievements}</Text>
+              <Text style={[styles.statValue, { color: theme.text }]}>{totalAchievements - unlockedCount}</Text>
               <Text style={[styles.statLabel, { color: theme.textSecondary }]}>Locked</Text>
             </View>
           </View>
         </View>
 
         {Object.keys(groupedAchievements).map(category => (
-          <View key={category} style={[styles.section, { backgroundColor: theme.card }]}>
+          <View key={category} style={[styles.section, {
+            backgroundColor: theme.card,
+            shadowColor: theme.isDark ? '#000000' : '#000000',
+            shadowOpacity: theme.isDark ? 0.2 : 0.1,
+          }]}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>{category}</Text>
 
             {groupedAchievements[category].map(achievement => {
-              const isUnlocked = achievements.unlocked?.includes(achievement.id);
+              const isUnlocked = unlockedAchievements.includes(achievement.id);
               const progressPercentage = Math.min(
                 Math.round((achievement.progress / achievement.threshold) * 100),
                 100
@@ -176,8 +188,8 @@ const AchievementsScreen = () => {
                   key={achievement.id}
                   style={[
                     styles.achievementCard,
-                    { backgroundColor: theme.isDark ? theme.card : '#F8F9FA' },
-                    isUnlocked && [styles.unlockedAchievementCard, { backgroundColor: theme.primaryLight }]
+                    { backgroundColor: theme.isDark ? theme.backgroundAlt : '#F8F9FA' },
+                    isUnlocked && [styles.unlockedAchievementCard, { backgroundColor: theme.isDark ? theme.primaryDark : theme.primaryLight }]
                   ]}
                 >
                   <View style={styles.achievementHeader}>
@@ -190,7 +202,7 @@ const AchievementsScreen = () => {
                       <Ionicons
                         name={achievement.icon}
                         size={24}
-                        color="#FFFFFF"
+                        color={theme.buttonText}
                       />
                     </View>
 
@@ -199,7 +211,7 @@ const AchievementsScreen = () => {
                         style={[
                           styles.achievementTitle,
                           { color: theme.text },
-                          isUnlocked && { color: theme.primary }
+                          isUnlocked && { color: theme.isDark ? theme.buttonText : theme.primary }
                         ]}
                       >
                         {achievement.title}
@@ -214,7 +226,10 @@ const AchievementsScreen = () => {
                     <View
                       style={[
                         styles.progressBar,
-                        { width: `${progressPercentage}%`, backgroundColor: theme.isDark ? '#666666' : '#CCCCCC' },
+                        {
+                          width: `${progressPercentage}%`,
+                          backgroundColor: theme.isDark ? theme.border : '#CCCCCC'
+                        },
                         isUnlocked && { backgroundColor: achievement.color }
                       ]}
                     />
