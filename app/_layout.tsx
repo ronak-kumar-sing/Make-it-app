@@ -12,13 +12,20 @@ import { verifyDataIntegrity } from './utils/DataIntegrity';
 
 // Screens
 import AchievementsScreen from './screens/AchievementsScreen';
+import ActivityHistory from './screens/ActivityHistory';
+import ActivityTracker from './screens/ActivityTracker';
 import AddTaskScreen from './screens/AddTaskScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ExamsScreen from './screens/ExamsScreen';
+import HealthDashboardScreen from './screens/HealthDashboardScreen';
+import MoodTracker from './screens/MoodTracker';
+import NutritionTracker from './screens/NutritionTracker';
 import OnboardingScreen from './screens/OnboardingScreen';
+import PermissionsTestScreen from './screens/PermissionsTestScreen';
 import ResourcesScreen from './screens/ResourcesScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import SleepTracker from './screens/SleepTracker';
 import StreaksScreen from './screens/StreaksScreen';
 import TaskDetailScreen from './screens/TaskDetailScreen';
 import TasksScreen from './screens/TasksScreen';
@@ -27,6 +34,7 @@ import TimerScreen from './screens/TimerScreen';
 // Context
 import DataSyncProvider from './components/DataSyncProvider';
 import NotificationInitializer from './components/NotificationInitializer';
+import PermissionsInitializer from './components/PermissionsInitializer';
 import { AppProvider } from './context/AppContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 
@@ -107,6 +115,65 @@ function DashboardStack() {
         component={AchievementsScreen}
         options={{ headerShown: true, title: 'Achievements' }}
       />
+      <Stack.Screen
+        name="Health"
+        component={HealthDashboardScreen}
+        options={{ headerShown: true, title: 'Health & Wellness' }}
+      />
+      <Stack.Screen
+        name="ActivityTracker"
+        component={ActivityTracker}
+        options={{ headerShown: true, title: 'Activity Tracker' }}
+      />
+      <Stack.Screen
+        name="SleepTracker"
+        component={SleepTracker}
+        options={{ headerShown: true, title: 'Sleep Tracker' }}
+      />
+      <Stack.Screen
+        name="MoodTracker"
+        component={MoodTracker}
+        options={{ headerShown: true, title: 'Mood Tracker' }}
+      />
+      <Stack.Screen
+        name="NutritionTracker"
+        component={NutritionTracker}
+        options={{ headerShown: true, title: 'Nutrition Tracker' }}
+      />
+      <Stack.Screen
+        name="ActivityHistory"
+        component={ActivityHistory}
+        options={{ headerShown: true, title: 'Health History' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+function SettingsStack() {
+  const { theme } = useTheme();
+
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: theme.card,
+        },
+        headerTintColor: theme.text,
+        contentStyle: {
+          backgroundColor: theme.background,
+        },
+      }}
+    >
+      <Stack.Screen
+        name="SettingsMain"
+        component={SettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="PermissionsTest"
+        component={PermissionsTestScreen}
+        options={{ headerShown: true, title: 'App Permissions' }}
+      />
     </Stack.Navigator>
   );
 }
@@ -147,7 +214,7 @@ function MainTabs() {
       <Tab.Screen name="Tasks" component={TasksStack} />
       <Tab.Screen name="Timer" component={TimerScreen} />
       <Tab.Screen name="Streaks" component={StreaksScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Settings" component={SettingsStack} />
     </Tab.Navigator>
   );
 }
@@ -203,6 +270,20 @@ export default function App() {
                   ) : null}
                   <Stack.Screen name="Main" component={MainTabs} />
                 </Stack.Navigator>
+
+                {/* Initialize all permissions when the app starts */}
+                <PermissionsInitializer
+                  onPermissionsInitialized={(statuses) => {
+                    console.log('Permissions initialized:', statuses);
+                    // You can handle specific permission states here if needed
+                    if (!statuses.notifications && Platform.OS === 'android') {
+                      // Maybe show a custom message for Android users about notifications
+                    }
+                  }}
+                />
+
+                {/* Keep notification initializer for backward compatibility */}
+                <NotificationInitializer />
               </DataSyncProvider>
             </AppProvider>
           </SafeAreaProvider>

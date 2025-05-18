@@ -42,6 +42,7 @@ type Settings = {
   dailyGoalMinutes: number;
   weeklyTaskGoal: number;
   notifications: boolean;
+  healthNotifications: boolean;
   theme: 'light' | 'dark' | 'system';
   focusMode: boolean;
   autoArchive: boolean;
@@ -180,6 +181,7 @@ const initialState: AppState = {
     dailyGoalMinutes: 120,
     weeklyTaskGoal: 15,
     notifications: true,
+    healthNotifications: true,
     theme: 'system',
     focusMode: false,
     autoArchive: false,

@@ -41,6 +41,10 @@ export const NOTIFICATION_TYPES = {
   DAILY_GOAL: 'DAILY_GOAL',
   STREAK_REMINDER: 'STREAK_REMINDER',
   ACHIEVEMENT_UNLOCKED: 'ACHIEVEMENT_UNLOCKED',
+  WATER_REMINDER: 'WATER_REMINDER',
+  ACTIVITY_REMINDER: 'ACTIVITY_REMINDER',
+  SLEEP_REMINDER: 'SLEEP_REMINDER',
+  MOOD_CHECK: 'MOOD_CHECK',
 };
 
 // Check if device can receive notifications
@@ -123,6 +127,13 @@ export const requestNotificationPermissions = async () => {
       name: 'Achievements',
       description: 'Notifications for achievement unlocks',
       importance: Notifications.AndroidImportance.LOW,
+    });
+
+    // Health notification channels
+    await Notifications.setNotificationChannelAsync('health', {
+      name: 'Health Reminders',
+      description: 'Notifications for health and wellness reminders',
+      importance: Notifications.AndroidImportance.DEFAULT,
     });
   }
 
@@ -499,6 +510,14 @@ export const isNotificationTypeEnabled = async (type: string) => {
         return parsedSettings.dailyGoals !== false;
       case NOTIFICATION_TYPES.ACHIEVEMENT_UNLOCKED:
         return parsedSettings.achievements !== false;
+      case NOTIFICATION_TYPES.WATER_REMINDER:
+        return parsedSettings.waterReminders !== false;
+      case NOTIFICATION_TYPES.ACTIVITY_REMINDER:
+        return parsedSettings.activityReminders !== false;
+      case NOTIFICATION_TYPES.SLEEP_REMINDER:
+        return parsedSettings.sleepReminders !== false;
+      case NOTIFICATION_TYPES.MOOD_CHECK:
+        return parsedSettings.moodChecks !== false;
       default:
         return true;
     }
@@ -553,5 +572,272 @@ export const initializeNotifications = async (
   // Schedule daily goal reminder if behind on daily goal
   if (dailyStudyMinutes < dailyGoalMinutes) {
     scheduleDailyGoalReminder(dailyStudyMinutes, dailyGoalMinutes);
+  }
+};
+
+// Schedule a water intake reminder
+export const scheduleWaterReminder = async (startHour = 9, endHour = 21) => {
+  try {
+    const { status } = await checkPermissions();
+    if (status !== 'granted') return null;
+
+    // Check if water reminders are enabled
+    if (!(await isNotificationTypeEnabled(NOTIFICATION_TYPES.WATER_REMINDER))) {
+      return null;
+    }
+
+    // Cancel any existing water reminders
+    const existingId = await AsyncStorage.getItem('waterReminder');
+    if (existingId) {
+      await Notifications.cancelScheduledNotificationAsync(existingId);
+    }
+
+    // Schedule reminders every 2 hours during the day
+    const now = new Date();
+    const triggers = [];
+
+    for (let hour = startHour; hour <= endHour; hour += 2) {
+      const scheduledTime = new Date(now);
+      scheduledTime.setHours(hour, 0, 0, 0);
+
+      // If time has already passed today, schedule for tomorrow
+      if (scheduledTime <= now) {
+        scheduledTime.setDate(scheduledTime.getDate() + 1);
+      }
+
+      triggers.push(scheduledTime);
+    }
+
+    const notificationIds = [];
+
+    for (const triggerTime of triggers) {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '💧 Hydration Reminder',
+          body: 'Staying hydrated improves cognitive function. Have you had water in the last hour?',
+          data: {
+            type: NOTIFICATION_TYPES.WATER_REMINDER,
+            screen: 'NutritionTracker',
+          },
+          sound: 'default',
+        },
+        trigger: {
+          date: triggerTime,
+          repeats: true,
+          channelId: 'health',
+        },
+      });
+
+      notificationIds.push(id);
+    }
+
+    // Store the notification IDs for later cancellation
+    await AsyncStorage.setItem('waterReminder', JSON.stringify(notificationIds));
+    return notificationIds;
+
+  } catch (err) {
+    console.error('Error scheduling water reminder:', err);
+    return null;
+  }
+};
+
+// Schedule a movement break reminder for study sessions
+export const scheduleActivityReminder = async (studyDuration = 25) => {
+  try {
+    const { status } = await checkPermissions();
+    if (status !== 'granted') return null;
+
+    // Check if activity reminders are enabled
+    if (!(await isNotificationTypeEnabled(NOTIFICATION_TYPES.ACTIVITY_REMINDER))) {
+      return null;
+    }
+
+    // Cancel any existing activity reminders
+    const existingId = await AsyncStorage.getItem('activityBreakReminder');
+    if (existingId) {
+      await Notifications.cancelScheduledNotificationAsync(existingId);
+    }
+
+    // Schedule to trigger after the study duration
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '🏃‍♂️ Movement Break',
+        body: `You've been studying for ${studyDuration} minutes. Take a quick activity break to recharge!`,
+        data: {
+          type: NOTIFICATION_TYPES.ACTIVITY_REMINDER,
+          screen: 'ActivityTracker',
+        },
+        sound: 'default',
+      },
+      trigger: {
+        seconds: studyDuration * 60,
+        channelId: 'health',
+      },
+    });
+
+    await AsyncStorage.setItem('activityBreakReminder', notificationId);
+    return notificationId;
+  } catch (err) {
+    console.error('Error scheduling activity break reminder:', err);
+    return null;
+  }
+};
+
+// Schedule a bedtime reminder
+export const scheduleSleepReminder = async (bedtimeHour = 22, bedtimeMinute = 0) => {
+  try {
+    const { status } = await checkPermissions();
+    if (status !== 'granted') return null;
+
+    // Check if sleep reminders are enabled
+    if (!(await isNotificationTypeEnabled(NOTIFICATION_TYPES.SLEEP_REMINDER))) {
+      return null;
+    }
+
+    // Cancel any existing sleep reminders
+    const existingId = await AsyncStorage.getItem('sleepReminder');
+    if (existingId) {
+      await Notifications.cancelScheduledNotificationAsync(existingId);
+    }
+
+    // Schedule 30 minutes before bedtime
+    const now = new Date();
+    const reminderTime = new Date(now);
+    reminderTime.setHours(bedtimeHour, bedtimeMinute - 30, 0, 0);
+
+    // If time has already passed today, schedule for tomorrow
+    if (reminderTime <= now) {
+      reminderTime.setDate(reminderTime.getDate() + 1);
+    }
+
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '😴 Sleep Reminder',
+        body: 'Time to wind down! Good sleep leads to better study sessions tomorrow.',
+        data: {
+          type: NOTIFICATION_TYPES.SLEEP_REMINDER,
+          screen: 'SleepTracker',
+        },
+        sound: 'default',
+      },
+      trigger: {
+        date: reminderTime,
+        repeats: true,
+        channelId: 'health',
+      },
+    });
+
+    await AsyncStorage.setItem('sleepReminder', notificationId);
+    return notificationId;
+  } catch (err) {
+    console.error('Error scheduling sleep reminder:', err);
+    return null;
+  }
+};
+
+// Schedule a mood check-in reminder
+export const scheduleMoodCheckIn = async (hour = 18, minute = 0) => {
+  try {
+    const { status } = await checkPermissions();
+    if (status !== 'granted') return null;
+
+    // Check if mood check reminders are enabled
+    if (!(await isNotificationTypeEnabled(NOTIFICATION_TYPES.MOOD_CHECK))) {
+      return null;
+    }
+
+    // Cancel any existing mood check reminders
+    const existingId = await AsyncStorage.getItem('moodCheckReminder');
+    if (existingId) {
+      await Notifications.cancelScheduledNotificationAsync(existingId);
+    }
+
+    // Schedule for the specified time
+    const now = new Date();
+    const reminderTime = new Date(now);
+    reminderTime.setHours(hour, minute, 0, 0);
+
+    // If time has already passed today, schedule for tomorrow
+    if (reminderTime <= now) {
+      reminderTime.setDate(reminderTime.getDate() + 1);
+    }
+
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '😊 Mood Check-in',
+        body: 'How are you feeling today? Track your mood to build awareness of your mental wellness.',
+        data: {
+          type: NOTIFICATION_TYPES.MOOD_CHECK,
+          screen: 'MoodTracker',
+        },
+        sound: 'default',
+      },
+      trigger: {
+        date: reminderTime,
+        repeats: true,
+        channelId: 'health',
+      },
+    });
+
+    await AsyncStorage.setItem('moodCheckReminder', notificationId);
+    return notificationId;
+  } catch (err) {
+    console.error('Error scheduling mood check reminder:', err);
+    return null;
+  }
+};
+
+// Initialize all health notifications
+export const initializeHealthNotifications = async (healthNotificationsEnabled = true) => {
+  if (!healthNotificationsEnabled) return;
+
+  const permissionGranted = await requestNotificationPermissions();
+  if (!permissionGranted) return;
+
+  // Schedule all health-related reminders
+  await scheduleWaterReminder();
+  await scheduleSleepReminder();
+  await scheduleMoodCheckIn();
+};
+
+// Cancel all health-related notifications
+export const cancelHealthNotifications = async () => {
+  try {
+    // Cancel water reminders
+    const waterRemindersStr = await AsyncStorage.getItem('waterReminder');
+    if (waterRemindersStr) {
+      const waterReminderIds = JSON.parse(waterRemindersStr);
+      for (const id of waterReminderIds) {
+        await Notifications.cancelScheduledNotificationAsync(id);
+      }
+      await AsyncStorage.removeItem('waterReminder');
+    }
+
+    // Cancel activity break reminders
+    const activityBreakId = await AsyncStorage.getItem('activityBreakReminder');
+    if (activityBreakId) {
+      await Notifications.cancelScheduledNotificationAsync(activityBreakId);
+      await AsyncStorage.removeItem('activityBreakReminder');
+    }
+
+    // Cancel sleep reminders
+    const sleepReminderId = await AsyncStorage.getItem('sleepReminder');
+    if (sleepReminderId) {
+      await Notifications.cancelScheduledNotificationAsync(sleepReminderId);
+      await AsyncStorage.removeItem('sleepReminder');
+    }
+
+    // Cancel mood check reminders
+    const moodCheckId = await AsyncStorage.getItem('moodCheckReminder');
+    if (moodCheckId) {
+      await Notifications.cancelScheduledNotificationAsync(moodCheckId);
+      await AsyncStorage.removeItem('moodCheckReminder');
+    }
+
+    console.log('All health notifications cancelled');
+    return true;
+  } catch (err) {
+    console.error('Error cancelling health notifications:', err);
+    return false;
   }
 };

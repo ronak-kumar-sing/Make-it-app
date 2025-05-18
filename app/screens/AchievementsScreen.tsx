@@ -7,7 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 
 const AchievementsScreen = () => {
   const { achievements, stats, streaks } = useContext(AppContext);
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
 
   // Handle case where achievements may not be initialized
   const unlockedAchievements = achievements?.unlocked || [];
@@ -145,8 +145,8 @@ const AchievementsScreen = () => {
 
         <View style={[styles.statsContainer, {
           backgroundColor: theme.card,
-          shadowColor: theme.isDark ? '#000000' : '#000000',
-          shadowOpacity: theme.isDark ? 0.2 : 0.1,
+          shadowColor: isDark ? '#000000' : '#000000',
+          shadowOpacity: isDark ? 0.2 : 0.1,
         }]}>
           <View style={styles.progressContainer}>
             <View style={[styles.progressCircle, { backgroundColor: theme.primaryLight }]}>
@@ -171,8 +171,8 @@ const AchievementsScreen = () => {
         {Object.keys(groupedAchievements).map(category => (
           <View key={category} style={[styles.section, {
             backgroundColor: theme.card,
-            shadowColor: theme.isDark ? '#000000' : '#000000',
-            shadowOpacity: theme.isDark ? 0.2 : 0.1,
+            shadowColor: isDark ? '#000000' : '#000000',
+            shadowOpacity: isDark ? 0.2 : 0.1,
           }]}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>{category}</Text>
 
@@ -188,15 +188,17 @@ const AchievementsScreen = () => {
                   key={achievement.id}
                   style={[
                     styles.achievementCard,
-                    { backgroundColor: theme.isDark ? theme.backgroundAlt : '#F8F9FA' },
-                    isUnlocked && [styles.unlockedAchievementCard, { backgroundColor: theme.isDark ? theme.primaryDark : theme.primaryLight }]
+                    { backgroundColor: isDark ? theme.backgroundAlt : '#F8F9FA' },
+                    isUnlocked && [styles.unlockedAchievementCard, {
+                      backgroundColor: isDark ? theme.primaryDark : theme.primaryLight
+                    }]
                   ]}
                 >
                   <View style={styles.achievementHeader}>
                     <View
                       style={[
                         styles.achievementIcon,
-                        { backgroundColor: isUnlocked ? achievement.color : theme.isDark ? '#555555' : '#CCCCCC' }
+                        { backgroundColor: isUnlocked ? achievement.color : isDark ? '#555555' : '#CCCCCC' }
                       ]}
                     >
                       <Ionicons
@@ -211,7 +213,7 @@ const AchievementsScreen = () => {
                         style={[
                           styles.achievementTitle,
                           { color: theme.text },
-                          isUnlocked && { color: theme.isDark ? theme.buttonText : theme.primary }
+                          isUnlocked && { color: isDark ? theme.primary : theme.primaryDark }
                         ]}
                       >
                         {achievement.title}
@@ -222,13 +224,13 @@ const AchievementsScreen = () => {
                     </View>
                   </View>
 
-                  <View style={[styles.progressBarContainer, { backgroundColor: theme.isDark ? '#444444' : '#EEEEEE' }]}>
+                  <View style={[styles.progressBarContainer, { backgroundColor: isDark ? '#444444' : '#EEEEEE' }]}>
                     <View
                       style={[
                         styles.progressBar,
                         {
                           width: `${progressPercentage}%`,
-                          backgroundColor: theme.isDark ? theme.border : '#CCCCCC'
+                          backgroundColor: isDark ? theme.primaryLight : '#CCCCCC'
                         },
                         isUnlocked && { backgroundColor: achievement.color }
                       ]}

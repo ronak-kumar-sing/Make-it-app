@@ -24,6 +24,7 @@ type RootStackParamList = {
   Resources: undefined;
   Analytics: undefined;
   Achievements: undefined;
+  Health: undefined;
 };
 
 const DashboardScreen = () => {
@@ -338,6 +339,16 @@ const DashboardScreen = () => {
             >
               <Ionicons name="trophy-outline" size={24} color={theme.primary} />
               <Text style={[styles.quickActionText, { color: theme.primary }]}>Achievements</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.quickActions}>
+            <TouchableOpacity
+              style={[styles.quickAction, { backgroundColor: theme.primaryLight }]}
+              onPress={() => navigation.navigate('Health')}
+            >
+              <Ionicons name="fitness-outline" size={24} color={theme.primary} />
+              <Text style={[styles.quickActionText, { color: theme.primary }]}>Health & Wellness</Text>
             </TouchableOpacity>
           </View>
         </View>

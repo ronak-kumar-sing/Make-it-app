@@ -402,10 +402,13 @@ const FormattedNoteViewer = ({ note }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    borderRadius: 8,
+    padding: 5,
   },
   scrollContentContainer: {
     paddingBottom: 10,
     // paddingHorizontal: 16,
+
   },
   contentContainer: {
     width: '100%',

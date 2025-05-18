@@ -120,8 +120,25 @@ export default function NutritionTracker({ navigation }) {
   };
 
   const handleFoodSelection = (food: FoodItem) => {
-    setSelectedFood(food);
-    setModalVisible(true);
+    // Instead of showing the modal, directly add the food item with default 1 serving
+    const newSelectedFoods = [...selectedFoods];
+    const existingIndex = newSelectedFoods.findIndex(item => item.foodId === food.id);
+
+    if (existingIndex !== -1) {
+      // Update servings if food already exists
+      newSelectedFoods[existingIndex].servings += 1;
+    } else {
+      // Add new food entry with default 1 serving
+      newSelectedFoods.push({
+        foodId: food.id,
+        foodItem: food,
+        servings: 1
+      });
+    }
+
+    setSelectedFoods(newSelectedFoods);
+    setSearchQuery('');
+    setSearchResults([]);
   };
 
   const handleAddFood = () => {
@@ -131,10 +148,10 @@ export default function NutritionTracker({ navigation }) {
     const existingIndex = newSelectedFoods.findIndex(item => item.foodId === selectedFood.id);
 
     if (existingIndex !== -1) {
-      // Update servings if food already exists
-      newSelectedFoods[existingIndex].servings += Number(servings);
+      // Update the servings for existing item
+      newSelectedFoods[existingIndex].servings = Number(servings);
     } else {
-      // Add new food entry
+      // Add new food entry if not already in the list
       newSelectedFoods.push({
         foodId: selectedFood.id,
         foodItem: selectedFood,
@@ -249,14 +266,14 @@ export default function NutritionTracker({ navigation }) {
   const renderFoodItem = ({ item }: { item: FoodItem }) => {
     return (
       <TouchableOpacity
-        style={[styles.searchResultItem, { borderColor: theme.border }]}
+        style={[styles.searchResultItem, { borderColor: theme.border, backgroundColor: theme.cardLight }]}
         onPress={() => handleFoodSelection(item)}
       >
         <View style={styles.foodInfo}>
           <Ionicons name={getFoodCategoryIcon(item.category)} size={24} color={theme.primary} />
           <View style={styles.foodTextContainer}>
             <Text style={[styles.foodName, { color: theme.text }]}>{item.name}</Text>
-            <Text style={[styles.foodDetails, { color: theme.textLight }]}>
+            <Text style={[styles.foodDetails, { color: theme.textSecondary }]}>
               {item.servingSize} • {item.nutrition.calories} cal
             </Text>
           </View>
@@ -273,14 +290,27 @@ export default function NutritionTracker({ navigation }) {
           <Ionicons name={getFoodCategoryIcon(item.foodItem.category)} size={20} color={theme.primary} />
           <View style={styles.foodTextContainer}>
             <Text style={[styles.selectedFoodName, { color: theme.text }]}>{item.foodItem.name}</Text>
-            <Text style={[styles.foodDetails, { color: theme.textLight }]}>
+            <Text style={[styles.foodDetails, { color: theme.textSecondary }]}>
               {item.servings} x {item.foodItem.servingSize} • {item.foodItem.nutrition.calories * item.servings} cal
             </Text>
           </View>
         </View>
-        <TouchableOpacity onPress={() => handleRemoveFood(item.foodId)}>
-          <Ionicons name="close-circle-outline" size={24} color={theme.error} />
-        </TouchableOpacity>
+        <View style={styles.itemActions}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => {
+              // Open the modal for editing when clicking on the edit button
+              setSelectedFood(item.foodItem);
+              setServings(item.servings.toString());
+              setModalVisible(true);
+            }}
+          >
+            <Ionicons name="create-outline" size={20} color={theme.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleRemoveFood(item.foodId)}>
+            <Ionicons name="close-circle-outline" size={24} color={theme.danger} />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -296,14 +326,23 @@ export default function NutritionTracker({ navigation }) {
     // Only show up to 5 results to avoid excessive nesting
     const limitedResults = searchResults.slice(0, 5);
     return (
-      <View style={[styles.searchResults, { backgroundColor: theme.card }]}>
-        {limitedResults.map(item => (
-          <React.Fragment key={item.id}>
-            {renderFoodItem({ item })}
-          </React.Fragment>
-        ))}
+      <View style={[styles.searchResultsContainer]}>
+        <FlatList
+          data={limitedResults}
+          keyExtractor={item => item.id}
+          renderItem={renderFoodItem}
+          style={[styles.searchResults, {
+            backgroundColor: theme.cardLight,
+            borderColor: theme.border,
+            borderWidth: 1
+          }]}
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
+          showsVerticalScrollIndicator={true}
+          contentContainerStyle={styles.searchResultsContent}
+        />
         {searchResults.length > 5 && (
-          <Text style={[styles.moreResultsText, { color: theme.textLight, textAlign: 'center', paddingVertical: 8 }]}>
+          <Text style={[styles.moreResultsText, { color: theme.textSecondary, textAlign: 'center', paddingVertical: 8 }]}>
             {searchResults.length - 5} more results found. Please refine your search.
           </Text>
         )}
@@ -330,7 +369,7 @@ export default function NutritionTracker({ navigation }) {
               <View style={styles.dateTimeContainer}>
                 {/* Date selection */}
                 <TouchableOpacity
-                  style={[styles.dateSelector, { borderColor: theme.border }]}
+                  style={[styles.dateSelector, { borderColor: theme.border, backgroundColor: theme.inputBackground }]}
                   onPress={() => setShowDatePicker(true)}
                 >
                   <Ionicons name="calendar-outline" size={24} color={theme.primary} />
@@ -341,7 +380,7 @@ export default function NutritionTracker({ navigation }) {
 
                 {/* Time selection */}
                 <TouchableOpacity
-                  style={[styles.dateSelector, { borderColor: theme.border }]}
+                  style={[styles.dateSelector, { borderColor: theme.border, backgroundColor: theme.inputBackground }]}
                   onPress={() => setShowTimePicker(true)}
                 >
                   <Ionicons name="time-outline" size={24} color={theme.primary} />
@@ -372,61 +411,68 @@ export default function NutritionTracker({ navigation }) {
 
               {/* Food Search */}
               <Text style={[styles.label, { color: theme.text, marginTop: 20 }]}>Add Food Items</Text>
-              <View style={[styles.searchContainer, { borderColor: theme.border }]}>
-                <Ionicons name="search-outline" size={20} color={theme.textLight} />
+              <View style={[styles.searchContainer, { borderColor: theme.border, backgroundColor: theme.inputBackground }]}>
+                <Ionicons name="search-outline" size={20} color={theme.textSecondary} />
                 <TextInput
                   style={[styles.searchInput, { color: theme.text }]}
                   placeholder="Search Indian foods..."
-                  placeholderTextColor={theme.textLight}
+                  placeholderTextColor={theme.textSecondary}
                   value={searchQuery}
                   onChangeText={handleSearch}
                 />
               </View>
 
-              {/* Search Results - Displayed as individual components, not a FlatList */}
+              {/* Search Results - Now using FlatList */}
               {renderSearchResults()}
 
-              {/* Selected Foods - Displayed as individual components, not a FlatList */}
+              {/* Selected Foods - Now using FlatList for better organization */}
               {selectedFoods.length > 0 && (
                 <>
                   <Text style={[styles.label, { color: theme.text, marginTop: 20 }]}>Selected Foods</Text>
-                  <View style={styles.selectedFoodsList}>
-                    {selectedFoods.map(item => (
-                      <React.Fragment key={item.foodId}>
-                        {renderSelectedFoodItem({ item })}
-                      </React.Fragment>
-                    ))}
-                  </View>
+                  <FlatList
+                    data={selectedFoods}
+                    keyExtractor={item => item.foodId}
+                    renderItem={renderSelectedFoodItem}
+                    style={[styles.selectedFoodsList, { backgroundColor: theme.cardLight, borderRadius: 8 }]}
+                    scrollEnabled={false}
+                    ItemSeparatorComponent={() => (
+                      <View style={[styles.separator, { backgroundColor: theme.border }]} />
+                    )}
+                    contentContainerStyle={styles.selectedFoodsListContent}
+                  />
 
                   {/* Nutrition Summary */}
-                  <View style={[styles.nutritionSummary, { borderColor: theme.border }]}>
+                  <View style={[styles.nutritionSummary, {
+                    borderColor: theme.border,
+                    backgroundColor: theme.inputBackground
+                  }]}>
                     <Text style={[styles.nutritionSummaryTitle, { color: theme.text }]}>Total Nutrition</Text>
                     <View style={styles.nutrientRow}>
-                      <Text style={[styles.nutrientLabel, { color: theme.textLight }]}>Calories:</Text>
+                      <Text style={[styles.nutrientLabel, { color: theme.textSecondary }]}>Calories:</Text>
                       <Text style={[styles.nutrientValue, { color: theme.text }]}>
                         {Math.round(calculateTotalNutrition().calories)} kcal
                       </Text>
                     </View>
                     <View style={styles.nutrientRow}>
-                      <Text style={[styles.nutrientLabel, { color: theme.textLight }]}>Protein:</Text>
+                      <Text style={[styles.nutrientLabel, { color: theme.textSecondary }]}>Protein:</Text>
                       <Text style={[styles.nutrientValue, { color: theme.text }]}>
                         {Math.round(calculateTotalNutrition().protein)}g
                       </Text>
                     </View>
                     <View style={styles.nutrientRow}>
-                      <Text style={[styles.nutrientLabel, { color: theme.textLight }]}>Carbs:</Text>
+                      <Text style={[styles.nutrientLabel, { color: theme.textSecondary }]}>Carbs:</Text>
                       <Text style={[styles.nutrientValue, { color: theme.text }]}>
                         {Math.round(calculateTotalNutrition().carbs)}g
                       </Text>
                     </View>
                     <View style={styles.nutrientRow}>
-                      <Text style={[styles.nutrientLabel, { color: theme.textLight }]}>Fat:</Text>
+                      <Text style={[styles.nutrientLabel, { color: theme.textSecondary }]}>Fat:</Text>
                       <Text style={[styles.nutrientValue, { color: theme.text }]}>
                         {Math.round(calculateTotalNutrition().fat)}g
                       </Text>
                     </View>
                     <View style={styles.nutrientRow}>
-                      <Text style={[styles.nutrientLabel, { color: theme.textLight }]}>Fiber:</Text>
+                      <Text style={[styles.nutrientLabel, { color: theme.textSecondary }]}>Fiber:</Text>
                       <Text style={[styles.nutrientValue, { color: theme.text }]}>
                         {Math.round(calculateTotalNutrition().fiber)}g
                       </Text>
@@ -437,17 +483,17 @@ export default function NutritionTracker({ navigation }) {
 
               {/* Water Intake */}
               <Text style={[styles.label, { color: theme.text, marginTop: 20 }]}>Water Intake (mL)</Text>
-              <View style={[styles.waterInputContainer, { borderColor: theme.border }]}>
+              <View style={[styles.waterInputContainer, { borderColor: theme.border, backgroundColor: theme.inputBackground }]}>
                 <Ionicons name="water-outline" size={24} color={theme.primary} />
                 <TextInput
                   style={[styles.waterInput, { color: theme.text }]}
                   placeholder="0"
-                  placeholderTextColor={theme.textLight}
+                  placeholderTextColor={theme.textSecondary}
                   keyboardType="numeric"
                   value={waterIntake}
                   onChangeText={setWaterIntake}
                 />
-                <Text style={[styles.waterUnit, { color: theme.textLight }]}>mL</Text>
+                <Text style={[styles.waterUnit, { color: theme.textSecondary }]}>mL</Text>
               </View>
 
               {healthGoals && waterIntake && (
@@ -471,7 +517,7 @@ export default function NutritionTracker({ navigation }) {
                       ]}
                     />
                   </View>
-                  <Text style={[styles.waterProgressText, { color: theme.textLight }]}>
+                  <Text style={[styles.waterProgressText, { color: theme.textSecondary }]}>
                     {waterIntake ? parseInt(waterIntake) : 0} of {healthGoals.waterIntake} mL
                   </Text>
                 </View>
@@ -479,17 +525,17 @@ export default function NutritionTracker({ navigation }) {
 
               {/* Caffeine Intake */}
               <Text style={[styles.label, { color: theme.text, marginTop: 20 }]}>Caffeine Intake (mg) - Optional</Text>
-              <View style={[styles.waterInputContainer, { borderColor: theme.border }]}>
-                <Ionicons name="cafe-outline" size={24} color={theme.accent} />
+              <View style={[styles.waterInputContainer, { borderColor: theme.border, backgroundColor: theme.inputBackground }]}>
+                <Ionicons name="cafe-outline" size={24} color={theme.accent || theme.primary} />
                 <TextInput
                   style={[styles.waterInput, { color: theme.text }]}
                   placeholder="0"
-                  placeholderTextColor={theme.textLight}
+                  placeholderTextColor={theme.textSecondary}
                   keyboardType="numeric"
                   value={caffeine}
                   onChangeText={setCaffeine}
                 />
-                <Text style={[styles.waterUnit, { color: theme.textLight }]}>mg</Text>
+                <Text style={[styles.waterUnit, { color: theme.textSecondary }]}>mg</Text>
               </View>
 
               {/* Notes input */}
@@ -504,7 +550,7 @@ export default function NutritionTracker({ navigation }) {
                   },
                 ]}
                 placeholder="How was your meal? Any digestive issues or cravings?"
-                placeholderTextColor={theme.textLight}
+                placeholderTextColor={theme.textSecondary}
                 multiline={true}
                 numberOfLines={3}
                 value={notes}
@@ -534,14 +580,17 @@ export default function NutritionTracker({ navigation }) {
 
               {nutritionHistory.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Ionicons name="restaurant-outline" size={40} color={theme.textLight} />
-                  <Text style={[styles.emptyStateText, { color: theme.textLight }]}>
+                  <Ionicons name="restaurant-outline" size={40} color={theme.textSecondary} />
+                  <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
                     No nutrition data recorded yet. Start tracking your meals to see history here.
                   </Text>
                 </View>
               ) : (
                 nutritionHistory.slice(0, 3).map((entry) => (
-                  <View key={entry.id} style={[styles.historyItem, { borderColor: theme.border }]}>
+                  <View key={entry.id} style={[styles.historyItem, {
+                    borderColor: theme.border,
+                    backgroundColor: theme.card
+                  }]}>
                     <View style={styles.historyItemHeader}>
                       <Text style={[styles.historyDate, { color: theme.text }]}>
                         {format(new Date(entry.date), 'MMM d')} at {entry.time}
@@ -559,7 +608,10 @@ export default function NutritionTracker({ navigation }) {
                             return food ? (
                               <Text
                                 key={index}
-                                style={[styles.historyFoodItem, { color: theme.textLight }]}
+                                style={[styles.historyFoodItem, {
+                                  color: theme.text,
+                                  backgroundColor: theme.inputBackground
+                                }]}
                                 numberOfLines={1}
                               >
                                 {foodItem.servings}x {food.name}
@@ -570,14 +622,14 @@ export default function NutritionTracker({ navigation }) {
                       )}
 
                       {entry.caffeine && (
-                        <Text style={[styles.caffeineBadge, { color: theme.accent }]}>
-                          <Ionicons name="cafe-outline" size={14} color={theme.accent} /> {entry.caffeine} mg caffeine
+                        <Text style={[styles.caffeineBadge, { color: theme.textSecondary }]}>
+                          <Ionicons name="cafe-outline" size={14} color={theme.textSecondary} /> {entry.caffeine} mg caffeine
                         </Text>
                       )}
                     </View>
 
                     {entry.notes && (
-                      <Text style={[styles.historyNotes, { color: theme.textLight }]}>
+                      <Text style={[styles.historyNotes, { color: theme.textSecondary }]}>
                         {entry.notes}
                       </Text>
                     )}
@@ -614,11 +666,14 @@ export default function NutritionTracker({ navigation }) {
                   <Text style={[styles.modalFoodName, { color: theme.text }]}>{selectedFood.name}</Text>
                 </View>
 
-                <Text style={[styles.modalFoodDescription, { color: theme.textLight }]}>
+                <Text style={[styles.modalFoodDescription, { color: theme.textSecondary }]}>
                   {selectedFood.description}
                 </Text>
 
-                <View style={[styles.nutritionContainer, { borderColor: theme.border }]}>
+                <View style={[styles.nutritionContainer, {
+                  borderColor: theme.border,
+                  backgroundColor: theme.inputBackground
+                }]}>
                   <Text style={[styles.nutritionTitle, { color: theme.text }]}>
                     Nutrition per {selectedFood.servingSize}:
                   </Text>
@@ -627,25 +682,25 @@ export default function NutritionTracker({ navigation }) {
                       <Text style={[styles.nutrientValue, { color: theme.text }]}>
                         {selectedFood.nutrition.calories}
                       </Text>
-                      <Text style={[styles.nutrientName, { color: theme.textLight }]}>Calories</Text>
+                      <Text style={[styles.nutrientName, { color: theme.textSecondary }]}>Calories</Text>
                     </View>
                     <View style={styles.nutrientItem}>
                       <Text style={[styles.nutrientValue, { color: theme.text }]}>
                         {selectedFood.nutrition.protein}g
                       </Text>
-                      <Text style={[styles.nutrientName, { color: theme.textLight }]}>Protein</Text>
+                      <Text style={[styles.nutrientName, { color: theme.textSecondary }]}>Protein</Text>
                     </View>
                     <View style={styles.nutrientItem}>
                       <Text style={[styles.nutrientValue, { color: theme.text }]}>
                         {selectedFood.nutrition.carbs}g
                       </Text>
-                      <Text style={[styles.nutrientName, { color: theme.textLight }]}>Carbs</Text>
+                      <Text style={[styles.nutrientName, { color: theme.textSecondary }]}>Carbs</Text>
                     </View>
                     <View style={styles.nutrientItem}>
                       <Text style={[styles.nutrientValue, { color: theme.text }]}>
                         {selectedFood.nutrition.fat}g
                       </Text>
-                      <Text style={[styles.nutrientName, { color: theme.textLight }]}>Fat</Text>
+                      <Text style={[styles.nutrientName, { color: theme.textSecondary }]}>Fat</Text>
                     </View>
                   </View>
                 </View>
@@ -676,6 +731,7 @@ export default function NutritionTracker({ navigation }) {
                       keyboardType="numeric"
                       value={servings}
                       onChangeText={setServings}
+                      placeholderTextColor={theme.textSecondary}
                     />
                     <TouchableOpacity
                       style={[styles.servingsButton, { borderColor: theme.border }]}
@@ -694,24 +750,36 @@ export default function NutritionTracker({ navigation }) {
                   {selectedFood.healthBenefits.map((benefit, index) => (
                     <View key={index} style={styles.benefitItem}>
                       <Ionicons name="checkmark-circle-outline" size={16} color={theme.primary} />
-                      <Text style={[styles.benefitText, { color: theme.textLight }]}>{benefit}</Text>
+                      <Text style={[styles.benefitText, { color: theme.textSecondary }]}>{benefit}</Text>
                     </View>
                   ))}
                 </View>
 
                 <View style={styles.tagContainer}>
                   {selectedFood.isVegetarian && (
-                    <View style={[styles.dietTag, { backgroundColor: theme.primaryLight }]}>
+                    <View style={[styles.dietTag, {
+                      backgroundColor: theme.primaryLight,
+                      borderColor: theme.border,
+                      borderWidth: 1
+                    }]}>
                       <Text style={[styles.dietTagText, { color: theme.primary }]}>Vegetarian</Text>
                     </View>
                   )}
                   {selectedFood.isVegan && (
-                    <View style={[styles.dietTag, { backgroundColor: theme.primaryLight }]}>
+                    <View style={[styles.dietTag, {
+                      backgroundColor: theme.primaryLight,
+                      borderColor: theme.border,
+                      borderWidth: 1
+                    }]}>
                       <Text style={[styles.dietTagText, { color: theme.primary }]}>Vegan</Text>
                     </View>
                   )}
                   {selectedFood.isGlutenFree && (
-                    <View style={[styles.dietTag, { backgroundColor: theme.primaryLight }]}>
+                    <View style={[styles.dietTag, {
+                      backgroundColor: theme.primaryLight,
+                      borderColor: theme.border,
+                      borderWidth: 1
+                    }]}>
                       <Text style={[styles.dietTagText, { color: theme.primary }]}>Gluten Free</Text>
                     </View>
                   )}
@@ -794,10 +862,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 8,
   },
+  searchResultsContainer: {
+    marginTop: 8,
+    zIndex: 999,
+    elevation: 3,
+  },
   searchResults: {
     maxHeight: 200,
-    marginTop: 8,
     borderRadius: 8,
+    overflow: 'hidden',
+  },
+  searchResultsContent: {
+    paddingVertical: 4,
   },
   searchResultItem: {
     flexDirection: 'row',
@@ -824,20 +900,21 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   selectedFoodsList: {
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+    borderRadius: 8,
+    overflow: 'hidden',
     marginTop: 8,
+  },
+  selectedFoodsListContent: {
+    paddingVertical: 4,
   },
   selectedFoodItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
     borderLeftWidth: 3,
-  },
-  selectedFoodName: {
-    fontSize: 14,
-    fontWeight: '500',
   },
   nutritionSummary: {
     marginTop: 16,
@@ -1080,11 +1157,11 @@ const styles = StyleSheet.create({
   benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   benefitText: {
     fontSize: 14,
-    marginLeft: 8,
+    marginLeft: 4,
   },
   tagContainer: {
     flexDirection: 'row',
@@ -1114,5 +1191,15 @@ const styles = StyleSheet.create({
   moreResultsText: {
     fontSize: 12,
     padding: 8,
+  },
+  itemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editButton: {
+    marginRight: 10,
+  },
+  separator: {
+    height: 1,
   },
 });
