@@ -10,6 +10,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true, // Required for iOS 14+
+    shouldShowList: true, // Required for iOS 14+
   }),
 });
 
@@ -41,10 +43,6 @@ export const NOTIFICATION_TYPES = {
   DAILY_GOAL: 'DAILY_GOAL',
   STREAK_REMINDER: 'STREAK_REMINDER',
   ACHIEVEMENT_UNLOCKED: 'ACHIEVEMENT_UNLOCKED',
-  WATER_REMINDER: 'WATER_REMINDER',
-  ACTIVITY_REMINDER: 'ACTIVITY_REMINDER',
-  SLEEP_REMINDER: 'SLEEP_REMINDER',
-  MOOD_CHECK: 'MOOD_CHECK',
 };
 
 // Check if device can receive notifications
@@ -510,14 +508,6 @@ export const isNotificationTypeEnabled = async (type: string) => {
         return parsedSettings.dailyGoals !== false;
       case NOTIFICATION_TYPES.ACHIEVEMENT_UNLOCKED:
         return parsedSettings.achievements !== false;
-      case NOTIFICATION_TYPES.WATER_REMINDER:
-        return parsedSettings.waterReminders !== false;
-      case NOTIFICATION_TYPES.ACTIVITY_REMINDER:
-        return parsedSettings.activityReminders !== false;
-      case NOTIFICATION_TYPES.SLEEP_REMINDER:
-        return parsedSettings.sleepReminders !== false;
-      case NOTIFICATION_TYPES.MOOD_CHECK:
-        return parsedSettings.moodChecks !== false;
       default:
         return true;
     }

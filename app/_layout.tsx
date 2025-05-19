@@ -12,20 +12,14 @@ import { verifyDataIntegrity } from './utils/DataIntegrity';
 
 // Screens
 import AchievementsScreen from './screens/AchievementsScreen';
-import ActivityHistory from './screens/ActivityHistory';
-import ActivityTracker from './screens/ActivityTracker';
 import AddTaskScreen from './screens/AddTaskScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ExamsScreen from './screens/ExamsScreen';
-import HealthDashboardScreen from './screens/HealthDashboardScreen';
-import MoodTracker from './screens/MoodTracker';
-import NutritionTracker from './screens/NutritionTracker';
 import OnboardingScreen from './screens/OnboardingScreen';
 import PermissionsTestScreen from './screens/PermissionsTestScreen';
 import ResourcesScreen from './screens/ResourcesScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import SleepTracker from './screens/SleepTracker';
 import StreaksScreen from './screens/StreaksScreen';
 import TaskDetailScreen from './screens/TaskDetailScreen';
 import TasksScreen from './screens/TasksScreen';
@@ -114,36 +108,6 @@ function DashboardStack() {
         name="Achievements"
         component={AchievementsScreen}
         options={{ headerShown: true, title: 'Achievements' }}
-      />
-      <Stack.Screen
-        name="Health"
-        component={HealthDashboardScreen}
-        options={{ headerShown: true, title: 'Health & Wellness' }}
-      />
-      <Stack.Screen
-        name="ActivityTracker"
-        component={ActivityTracker}
-        options={{ headerShown: true, title: 'Activity Tracker' }}
-      />
-      <Stack.Screen
-        name="SleepTracker"
-        component={SleepTracker}
-        options={{ headerShown: true, title: 'Sleep Tracker' }}
-      />
-      <Stack.Screen
-        name="MoodTracker"
-        component={MoodTracker}
-        options={{ headerShown: true, title: 'Mood Tracker' }}
-      />
-      <Stack.Screen
-        name="NutritionTracker"
-        component={NutritionTracker}
-        options={{ headerShown: true, title: 'Nutrition Tracker' }}
-      />
-      <Stack.Screen
-        name="ActivityHistory"
-        component={ActivityHistory}
-        options={{ headerShown: true, title: 'Health History' }}
       />
     </Stack.Navigator>
   );

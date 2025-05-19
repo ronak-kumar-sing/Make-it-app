@@ -30,11 +30,6 @@ export default function NotificationInitializer() {
           stats.goalProgress.dailyStudyTime || 0,
           settings.dailyGoalMinutes
         );
-
-        // Initialize health-related notifications
-        await NotificationService.initializeHealthNotifications(
-          settings.healthNotifications !== false // Default to true if not explicitly set
-        );
       }
     };
 
@@ -45,7 +40,6 @@ export default function NotificationInitializer() {
     // notification registration as they persist at the OS level
   }, [
     settings.notifications,
-    settings.healthNotifications,
     tasks,
     exams,
     streaks.current,
