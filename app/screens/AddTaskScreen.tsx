@@ -17,7 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 const AddTaskScreen = () => {
   const navigation = useNavigation();
   const { addTask, subjects } = useContext(AppContext);
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme(); // Get isDark separately to avoid theme.isDark issues
 
   // Task state
   const [title, setTitle] = useState('');
@@ -110,7 +110,7 @@ const AddTaskScreen = () => {
                 key={item}
                 style={[
                   styles.subjectTag,
-                  { backgroundColor: theme.isDark ? theme.card : '#E1F5FE' },
+                  { backgroundColor: isDark ? theme.backgroundAlt : '#E1F5FE' },
                   subject === item && [styles.selectedSubject, { backgroundColor: '#01579B' }]
                 ]}
                 onPress={() => setSubject(item)}
@@ -118,7 +118,7 @@ const AddTaskScreen = () => {
                 <Text
                   style={[
                     styles.subjectText,
-                    { color: theme.isDark ? theme.primary : '#01579B' },
+                    { color: isDark ? theme.primary : '#01579B' },
                     subject === item && styles.selectedSubjectText
                   ]}
                 >
@@ -135,7 +135,7 @@ const AddTaskScreen = () => {
             <TouchableOpacity
               style={[
                 styles.priorityButton,
-                { backgroundColor: theme.isDark ? theme.card : '#F5F5F5' },
+                { backgroundColor: isDark ? theme.backgroundAlt : '#F5F5F5' },
                 priority === 'low' && styles.selectedPriorityLow
               ]}
               onPress={() => setPriority('low')}
@@ -158,7 +158,7 @@ const AddTaskScreen = () => {
             <TouchableOpacity
               style={[
                 styles.priorityButton,
-                { backgroundColor: theme.isDark ? theme.card : '#F5F5F5' },
+                { backgroundColor: isDark ? theme.backgroundAlt : '#F5F5F5' },
                 priority === 'medium' && styles.selectedPriorityMedium
               ]}
               onPress={() => setPriority('medium')}
@@ -181,7 +181,7 @@ const AddTaskScreen = () => {
             <TouchableOpacity
               style={[
                 styles.priorityButton,
-                { backgroundColor: theme.isDark ? theme.card : '#F5F5F5' },
+                { backgroundColor: isDark ? theme.backgroundAlt : '#F5F5F5' },
                 priority === 'high' && styles.selectedPriorityHigh
               ]}
               onPress={() => setPriority('high')}
@@ -228,7 +228,7 @@ const AddTaskScreen = () => {
           style={[styles.createButton, { backgroundColor: theme.primary }]}
           onPress={handleCreateTask}
         >
-          <Text style={styles.createButtonText}>Create Task</Text>
+          <Text style={[styles.createButtonText, { color: '#FFFFFF' }]}>Create Task</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

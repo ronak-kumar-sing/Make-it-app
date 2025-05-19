@@ -5,48 +5,57 @@ import { useColorScheme } from 'react-native';
 // Define theme types
 export type ThemeType = {
   background: string;
+  backgroundAlt: string; // Added new property
   card: string;
   text: string;
   textSecondary: string;
   primary: string;
   primaryLight: string;
+  primaryDark: string; // Added new property
   border: string;
   icon: string;
   success: string;
   warning: string;
   danger: string;
+  buttonText: string; // Added new property
   statusBar: 'light-content' | 'dark-content';
 };
 
 // Define light theme
 export const lightTheme: ThemeType = {
   background: '#F8F9FA',
+  backgroundAlt: '#F0F0F0', // Added new value
   card: '#FFFFFF',
   text: '#333333',
   textSecondary: '#666666',
   primary: '#6C63FF',
   primaryLight: '#F0EEFF',
+  primaryDark: '#5A53D5', // Added new value
   border: '#EEEEEE',
   icon: '#757575',
   success: '#4CAF50',
   warning: '#FFC107',
   danger: '#F44336',
+  buttonText: '#FFFFFF', // Added new value
   statusBar: 'dark-content',
 };
 
 // Define dark theme
 export const darkTheme: ThemeType = {
   background: '#121212',
+  backgroundAlt: '#1A1A1A', // Added new value
   card: '#1E1E1E',
   text: '#FFFFFF',
   textSecondary: '#AAAAAA',
   primary: '#8F85FF',
   primaryLight: '#2C2A3A',
+  primaryDark: '#453E9E', // Added new value
   border: '#333333',
   icon: '#BBBBBB',
   success: '#66BB6A',
   warning: '#FFCA28',
   danger: '#EF5350',
+  buttonText: '#FFFFFF', // Added new value
   statusBar: 'light-content',
 };
 

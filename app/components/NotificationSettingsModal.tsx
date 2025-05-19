@@ -19,6 +19,11 @@ const NotificationSettingsModal: React.FC<NotificationSettingsModalProps> = ({ v
     streakReminders: true,
     dailyGoals: true,
     achievements: true,
+    // Health-related notification settings
+    waterReminders: true,
+    activityReminders: true,
+    sleepReminders: true,
+    moodChecks: true,
   });
 
   // Load settings on first render
@@ -169,7 +174,7 @@ const NotificationSettingsModal: React.FC<NotificationSettingsModalProps> = ({ v
               />
             </View>
 
-            <View style={[styles.settingRow]}>
+            <View style={[styles.settingRow, { borderBottomColor: theme.border }]}>
               <View style={styles.settingInfo}>
                 <Ionicons name="trophy-outline" size={22} color={theme.primary} style={styles.icon} />
                 <View>
@@ -185,6 +190,87 @@ const NotificationSettingsModal: React.FC<NotificationSettingsModalProps> = ({ v
                 ios_backgroundColor={theme.border}
                 value={settings.achievements}
                 onValueChange={(value) => updateSetting('achievements', value)}
+              />
+            </View>
+
+            {/* Health Notification Settings Section */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Health Reminders</Text>
+            </View>
+
+            <View style={[styles.settingRow, { borderBottomColor: theme.border }]}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="water-outline" size={22} color={theme.primary} style={styles.icon} />
+                <View>
+                  <Text style={[styles.settingTitle, { color: theme.text }]}>Hydration Reminders</Text>
+                  <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
+                    Regular reminders to drink water
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                trackColor={{ false: theme.border, true: theme.primary }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor={theme.border}
+                value={settings.waterReminders}
+                onValueChange={(value) => updateSetting('waterReminders', value)}
+              />
+            </View>
+
+            <View style={[styles.settingRow, { borderBottomColor: theme.border }]}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="walk-outline" size={22} color={theme.primary} style={styles.icon} />
+                <View>
+                  <Text style={[styles.settingTitle, { color: theme.text }]}>Movement Breaks</Text>
+                  <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
+                    Reminders to move during long study sessions
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                trackColor={{ false: theme.border, true: theme.primary }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor={theme.border}
+                value={settings.activityReminders}
+                onValueChange={(value) => updateSetting('activityReminders', value)}
+              />
+            </View>
+
+            <View style={[styles.settingRow, { borderBottomColor: theme.border }]}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="moon-outline" size={22} color={theme.primary} style={styles.icon} />
+                <View>
+                  <Text style={[styles.settingTitle, { color: theme.text }]}>Sleep Reminders</Text>
+                  <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
+                    Reminders for healthy sleep habits
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                trackColor={{ false: theme.border, true: theme.primary }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor={theme.border}
+                value={settings.sleepReminders}
+                onValueChange={(value) => updateSetting('sleepReminders', value)}
+              />
+            </View>
+
+            <View style={[styles.settingRow]}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="happy-outline" size={22} color={theme.primary} style={styles.icon} />
+                <View>
+                  <Text style={[styles.settingTitle, { color: theme.text }]}>Mood Check-ins</Text>
+                  <Text style={[styles.settingDescription, { color: theme.textSecondary }]}>
+                    Daily prompts to track your emotional wellbeing
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                trackColor={{ false: theme.border, true: theme.primary }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor={theme.border}
+                value={settings.moodChecks}
+                onValueChange={(value) => updateSetting('moodChecks', value)}
               />
             </View>
           </ScrollView>
@@ -220,6 +306,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+  },
+  sectionHeader: {
+    paddingVertical: 12,
+    marginTop: 8,
+    marginBottom: 4,
+    borderBottomWidth: 0,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',

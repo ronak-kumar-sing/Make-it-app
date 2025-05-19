@@ -13,7 +13,7 @@ import * as NotificationService from '../services/NotificationService';
 import { verifyDataIntegrity } from '../utils/DataIntegrity';
 import { forceSyncAllData } from '../utils/StorageSync';
 
-const SettingsScreen = () => {
+const SettingsScreen = ({ navigation }) => {
   const {
     settings,
     updateSettings,
@@ -66,6 +66,7 @@ const SettingsScreen = () => {
   const [dailyGoalMinutes, setDailyGoalMinutes] = useState(settings.dailyGoalMinutes);
   const [weeklyTaskGoal, setWeeklyTaskGoal] = useState(settings.weeklyTaskGoal || 10);
   const [notifications, setNotifications] = useState(settings.notifications);
+  const [healthNotifications, setHealthNotifications] = useState(settings.healthNotifications !== false); // Default to true
   const [focusMode, setFocusMode] = useState(settings.focusMode);
   const [autoArchive, setAutoArchive] = useState(settings.autoArchive);
   const [archiveDays, setArchiveDays] = useState(settings.archiveDays);
@@ -128,7 +129,28 @@ const SettingsScreen = () => {
         stats.goalProgress.dailyStudyTime || 0,
         settings.dailyGoalMinutes
       );
+
+      // Also initialize health notifications if they're enabled
+      if (healthNotifications) {
+        NotificationService.initializeHealthNotifications(true);
+      }
     }
+  };
+
+  // Handle health notifications toggle
+  const handleHealthNotificationsChange = (value: boolean) => {
+    setHealthNotifications(value);
+
+    if (value && notifications) {
+      // If turning ON health notifications, initialize them
+      NotificationService.initializeHealthNotifications(true);
+    } else if (!value) {
+      // If turning OFF health notifications, cancel them
+      NotificationService.cancelHealthNotifications?.();
+    }
+
+    // Update the settings
+    updateSettings({ ...settings, healthNotifications: value });
   };
 
   const handleFocusModeChange = (value: boolean) => {
@@ -284,6 +306,7 @@ const SettingsScreen = () => {
       dailyGoalMinutes,
       weeklyTaskGoal,
       notifications,
+      healthNotifications,
       theme: isDark ? 'dark' : 'light',
       focusMode,
       autoArchive,
@@ -721,6 +744,18 @@ const SettingsScreen = () => {
 
           {notifications && (
             <>
+              <View style={styles.toggleItem}>
+                <Text style={[styles.toggleLabel, { color: theme.text }]}>Health Notifications</Text>
+                <Switch
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor={theme.border}
+                  onValueChange={handleHealthNotificationsChange}
+                  value={healthNotifications}
+                  disabled={!notifications}
+                />
+              </View>
+
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: theme.primaryLight, marginTop: 4 }]}
                 onPress={() => setShowNotificationSettings(true)}
@@ -764,6 +799,14 @@ const SettingsScreen = () => {
               value={privacyLock}
             />
           </View>
+
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: theme.primaryLight, marginTop: 8 }]}
+            onPress={() => navigation.navigate('PermissionsTest')}
+          >
+            <Ionicons name="shield-checkmark-outline" size={20} color={theme.primary} />
+            <Text style={[styles.actionButtonText, { color: theme.primary }]}>Manage App Permissions</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.section, { backgroundColor: theme.card }]}>

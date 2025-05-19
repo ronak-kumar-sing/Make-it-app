@@ -21,6 +21,7 @@ export default function NotificationInitializer() {
           return;
         }
 
+        // Initialize study-related notifications
         await NotificationService.initializeNotifications(
           true,
           tasks,
@@ -28,6 +29,11 @@ export default function NotificationInitializer() {
           streaks,
           stats.goalProgress.dailyStudyTime || 0,
           settings.dailyGoalMinutes
+        );
+
+        // Initialize health-related notifications
+        await NotificationService.initializeHealthNotifications(
+          settings.healthNotifications !== false // Default to true if not explicitly set
         );
       }
     };
@@ -37,7 +43,15 @@ export default function NotificationInitializer() {
 
     // When the component unmounts, we don't need to clean up
     // notification registration as they persist at the OS level
-  }, [settings.notifications, tasks, exams, streaks.current, stats.goalProgress.dailyStudyTime, settings.dailyGoalMinutes]);
+  }, [
+    settings.notifications,
+    settings.healthNotifications,
+    tasks,
+    exams,
+    streaks.current,
+    stats.goalProgress.dailyStudyTime,
+    settings.dailyGoalMinutes
+  ]);
 
   // This component doesn't render anything
   return null;
