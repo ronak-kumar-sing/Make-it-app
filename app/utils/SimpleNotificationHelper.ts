@@ -85,3 +85,6 @@ export const requestNotificationPermissions = async () => {
 export const showInAppAlert = (title: string, message: string) => {
   Alert.alert(title, message, [{ text: 'OK' }]);
 };
+
+// Added default export to satisfy React Navigation
+export default {};

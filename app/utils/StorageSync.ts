@@ -166,3 +166,6 @@ const updateSessionCount = async (date: string): Promise<void> => {
     console.error('Error updating session count:', error);
   }
 };
+
+// Added default export to satisfy React Navigation
+export default {};

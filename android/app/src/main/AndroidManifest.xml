@@ -9,9 +9,12 @@
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
   <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
 
-  <!-- Storage -->
-  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <!-- Background processing -->
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+  <!-- No longer need storage permissions -->
 
   <queries>
     <intent>
@@ -36,5 +39,16 @@
         <data android:scheme="makeit"/>
       </intent-filter>
     </activity>
+
+    <!-- Background Task Service for Timer -->
+    <service
+      android:name="expo.modules.taskManager.TaskManagerService"
+      android:exported="false" />
+
+    <!-- Foreground Service for persistent timer -->
+    <service
+      android:name="expo.modules.notifications.service.ExpoNotificationsService"
+      android:exported="false"
+      android:foregroundServiceType="dataSync" />
   </application>
 </manifest>

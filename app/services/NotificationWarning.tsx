@@ -46,3 +46,6 @@ export const hasFullNotificationSupport = (): boolean => {
   // iOS may have different limitations but generally works better in Expo Go
   return true;
 };
+
+// Added default export to satisfy React Navigation
+export default {};

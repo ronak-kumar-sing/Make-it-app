@@ -11,6 +11,7 @@ type Task = {
   title: string;
   description?: string;
   dueDate: string;
+  dueTime?: string; // Add time for the task
   createdAt: string;
   completed: boolean;
   completedAt?: string;
@@ -42,6 +43,7 @@ type Settings = {
   dailyGoalMinutes: number;
   weeklyTaskGoal: number;
   notifications: boolean;
+  taskReminderMinutes: number; // Minutes before task time to send reminder
   theme: 'light' | 'dark' | 'system';
   focusMode: boolean;
   autoArchive: boolean;
@@ -180,6 +182,7 @@ const initialState: AppState = {
     dailyGoalMinutes: 120,
     weeklyTaskGoal: 15,
     notifications: true,
+    taskReminderMinutes: 5, // Default reminder 5 minutes before task time
     theme: 'system',
     focusMode: false,
     autoArchive: false,
@@ -291,13 +294,17 @@ function appReducer(state: AppState, action: AppAction): AppState {
       const now = new Date();
       const isCompleting = !task.completed;
 
+      // Never automatically archive tasks when they are completed
+      // Instead, let them stay in the completed section for a while
       const updatedTasks = state.tasks.map(t => {
         if (t.id === taskId) {
           return {
             ...t,
             completed: isCompleting,
             completedAt: isCompleting ? now.toISOString() : undefined,
-            progress: isCompleting ? 100 : t.progress
+            progress: isCompleting ? 100 : t.progress,
+            // Don't auto-archive immediately, let it show in completed section first
+            archived: t.archived
           };
         }
         return t;
@@ -499,6 +506,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
       const archiveThreshold = new Date();
       archiveThreshold.setDate(now.getDate() - action.payload);
 
+      // Set one-day grace period threshold (24 hours)
+      const oneDayThreshold = new Date();
+      oneDayThreshold.setDate(now.getDate() - 1); // One day ago
+
       // Deletion threshold based on retention period
       const retentionThreshold = new Date();
       retentionThreshold.setDate(now.getDate() - (state.settings.taskRetentionWeeks * 7));
@@ -510,9 +521,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }
         return true;
       }).map(task => {
-        // Archive completed tasks older than archive threshold
-        if (task.completed && !task.archived && new Date(task.completedAt || '') < archiveThreshold) {
-          return { ...task, archived: true };
+        // Check if the task should be archived
+        if (task.completed && !task.archived) {
+          // Only consider archiving if the task has been completed for at least one day
+          const completedDate = task.completedAt ? new Date(task.completedAt) : null;
+
+          if (completedDate && completedDate < oneDayThreshold) {
+            // Task has been completed for at least one day, now check if it meets archiving criteria
+
+            // Archive if completed date is older than archive threshold
+            if (completedDate < archiveThreshold) {
+              return { ...task, archived: true };
+            }
+
+            // Archive if it's a past-due task AND has been completed for at least one day
+            const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+            const isPastDue = dueDate && dueDate <= now;
+
+            if (isPastDue) {
+              return { ...task, archived: true };
+            }
+          }
+          // Otherwise, keep it in the completed section (not archived yet)
         }
         return task;
       });
@@ -1037,19 +1067,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 0);
   }, [state.settings, state.tasks, state.exams, state.streaks, state.stats.goalProgress.dailyStudyTime]);
 
-  // Archive old tasks
-  const archiveOldTasks = useCallback((days?: number) => {
-    const archiveDays = days || state.settings.archiveDays;
-    dispatch({ type: 'ARCHIVE_OLD_TASKS', payload: archiveDays });
+  /**
+   * Archive old tasks based on the following rules:
+   * 1. Tasks must be completed for at least 24 hours before being eligible for archiving
+   * 2. After the 24-hour grace period, tasks are archived if:
+   *    - They were completed longer ago than the archiveDays setting, OR
+   *    - They are past due (completion date doesn't matter as long as it's >24h)
+   *
+   * @param days Optional override for the archiveDays setting
+   * @returns Number of tasks that were archived
+   */
+  const archiveOldTasks = useCallback(async (days?: number): Promise<number> => {
+    try {
+      // Use the improved ArchiveService instead of the reducer
+      const archiveDays = days || state.settings.archiveDays;
 
-    // Count how many tasks were archived
-    const now = new Date();
-    const archiveThreshold = new Date();
-    archiveThreshold.setDate(now.getDate() - archiveDays);
+      // Import dynamically to avoid circular dependencies
+      const ArchiveService = await import('../services/ArchiveService');
+      const result = await ArchiveService.runArchiveTaskManually();
 
-    return state.tasks.filter(
-      task => task.completed && !task.archived && new Date(task.completedAt || '') < archiveThreshold
-    ).length;
+      // If result has tasks that were archived or deleted, refresh our state
+      if (result.archived > 0 || result.deleted > 0) {
+        // Load tasks from storage to get the updated state
+        const tasksData = await AsyncStorage.getItem('tasks');
+        if (tasksData) {
+          const updatedTasks = JSON.parse(tasksData);
+          dispatch({ type: 'SET_TASKS', payload: updatedTasks });
+        }
+      }
+
+      return result.archived;
+    } catch (error) {
+      console.error('Error in archiveOldTasks:', error);
+
+      // Fall back to the original implementation if there's an error
+      const archiveDays = days || state.settings.archiveDays;
+      dispatch({ type: 'ARCHIVE_OLD_TASKS', payload: archiveDays });
+
+      // Count how many tasks were archived
+      const now = new Date();
+      const archiveThreshold = new Date();
+      archiveThreshold.setDate(now.getDate() - archiveDays);
+
+      // Count tasks that were archived (either by time threshold or because they're completed and past due)
+      return state.tasks.filter(task => {
+        if (!task.completed || task.archived) return false;
+
+        // Archive if completed and past archive threshold
+        const completedDate = task.completedAt ? new Date(task.completedAt) : null;
+        if (completedDate && completedDate < archiveThreshold) return true;
+
+        // Archive if completed and past due date
+        const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+        if (dueDate && dueDate <= now) return true;
+
+        return false;
+      }).length;
+    }
   }, [state.settings.archiveDays, state.tasks]);
 
   // Update goal progress
@@ -1330,4 +1404,5 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
-export default { AppContext, AppProvider };
+export { AppContext };
+export default AppProvider;

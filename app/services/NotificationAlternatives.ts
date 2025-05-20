@@ -276,3 +276,6 @@ export const addNotificationResponseReceivedListener = (
 ) => {
   return Notifications.addNotificationResponseReceivedListener(callback);
 };
+
+// Added default export to satisfy React Navigation
+export default {};

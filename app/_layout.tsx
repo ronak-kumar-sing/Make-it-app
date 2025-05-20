@@ -26,6 +26,7 @@ import TasksScreen from './screens/TasksScreen';
 import TimerScreen from './screens/TimerScreen';
 
 // Context
+import ArchiveTaskInitializer from './components/ArchiveTaskInitializer';
 import DataSyncProvider from './components/DataSyncProvider';
 import NotificationInitializer from './components/NotificationInitializer';
 import PermissionsInitializer from './components/PermissionsInitializer';
@@ -248,6 +249,9 @@ export default function App() {
 
                 {/* Keep notification initializer for backward compatibility */}
                 <NotificationInitializer />
+
+                {/* Initialize automatic task archiving */}
+                <ArchiveTaskInitializer />
               </DataSyncProvider>
             </AppProvider>
           </SafeAreaProvider>

@@ -125,3 +125,6 @@ export const initializeAndroidNotifications = async () => {
 
   await setupAndroidNotificationChannels();
 };
+
+// Added default export to satisfy React Navigation
+export default {};

@@ -11,10 +11,9 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSUserNotificationsUsageDescription": "We use notifications to remind you of tasks, exams, and timer sessions.",
-        "NSPhotoLibraryUsageDescription": "This app accesses your photos to let you add images to your study resources and notes.",
-        "NSPhotoLibraryAddUsageDescription": "This app saves images to your photo library when you export or share study materials."
-      }
+        "NSUserNotificationsUsageDescription": "We use notifications to remind you of tasks, exams, and timer sessions."
+      },
+      "bundleIdentifier": "com.ronakkumar123.Makeit"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,8 +24,7 @@
       "package": "com.ronakkumar123.Makeit",
       "permissions": [
         "NOTIFICATIONS",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -43,6 +41,16 @@
           "imageWidth": 180,
           "resizeMode": "cover",
           "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff",
+          "sounds": [
+            "./assets/sounds/notification.wav"
+          ]
         }
       ]
     ],

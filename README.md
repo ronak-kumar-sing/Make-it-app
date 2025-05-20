@@ -14,12 +14,20 @@ Make-it is a comprehensive productivity and study companion designed to help stu
 
 ### 📋 Task Management
 - Create, organize, and prioritize tasks
-- Set deadlines and reminders
-- Track completion status
+- Set deadlines and reminders with customizable time options
+- Track completion status with automatic archiving of completed past-due tasks
 - Categorize tasks by subject or project
+
+### 🗄️ Smart Task Management
+- Automatic archiving of completed tasks that are past their due date
+- Configurable retention periods for tasks
+- Clean interface with archived tasks hidden by default
+- Manual and automatic archive options
 
 ### ⏱️ Study Timer
 - Pomodoro technique implementation
+- Background timer functionality - keeps running when the app is minimized or screen is off
+- Persistent timer notification with real-time updates in the notification bar
 - Customizable work/break intervals
 - Session tracking and statistics
 - Focus mode to minimize distractions

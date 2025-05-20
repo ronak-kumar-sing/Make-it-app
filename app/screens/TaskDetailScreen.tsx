@@ -31,6 +31,7 @@ const TaskDetailScreen = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTask, setEditedTask] = useState({});
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Set edited task when task changes
   useEffect(() => {
@@ -55,6 +56,16 @@ const TaskDetailScreen = () => {
   const formatDate = (dateString) => {
     const date = parseISO(dateString);
     return format(date, 'EEEE, MMMM d, yyyy');
+  };
+
+  // Format time for display
+  const formatTime = (timeString) => {
+    if (!timeString) return 'No time set';
+
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+    return `${displayHours}:${minutes < 10 ? '0' + minutes : minutes} ${period}`;
   };
 
   // Get due date status
@@ -91,6 +102,18 @@ const TaskDetailScreen = () => {
     const currentDate = selectedDate || parseISO(editedTask.dueDate);
     setShowDatePicker(false);
     setEditedTask(prev => ({ ...prev, dueDate: currentDate.toISOString() }));
+  };
+
+  // Handle time change
+  const onTimeChange = (event, selectedTime) => {
+    setShowTimePicker(false);
+    if (selectedTime) {
+      const hours = selectedTime.getHours();
+      const minutes = selectedTime.getMinutes();
+      const formattedHours = hours < 10 ? `0${hours}` : hours;
+      const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+      setEditedTask(prev => ({ ...prev, dueTime: `${formattedHours}:${formattedMinutes}` }));
+    }
   };
 
   // Handle task update
@@ -201,11 +224,32 @@ const TaskDetailScreen = () => {
 
               <View style={styles.sectionContent}>
                 <Text style={[styles.dateText, { color: theme.text }]}>{formatDate(task.dueDate)}</Text>
+                {task.dueTime && (
+                  <Text style={[styles.timeText, { color: theme.text }]}>Time: {formatTime(task.dueTime)}</Text>
+                )}
                 <View style={[styles.statusBadge, { backgroundColor: `${status.color}20` }]}>
                   <Text style={[styles.statusText, { color: status.color }]}>
                     {status.text}
                   </Text>
                 </View>
+
+                {(status.text === 'Overdue' || status.text === 'Due today') && !task.completed && (
+                  <Text style={[styles.archiveInfo, { color: theme.textSecondary }]}>
+                    Note: This task will be automatically archived when completed
+                  </Text>
+                )}
+
+                {(status.text === 'Overdue' || status.text === 'Due today') && !task.completed && (
+                  <Text style={[styles.archiveInfo, { color: theme.textSecondary }]}>
+                    Note: This task will be automatically archived when completed
+                  </Text>
+                )}
+
+                {task.completed && (status.text === 'Overdue' || status.text === 'Due today') && (
+                  <Text style={[styles.archiveInfo, { color: theme.warning }]}>
+                    This task will be automatically archived soon
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -329,11 +373,11 @@ const TaskDetailScreen = () => {
               <Text style={[styles.label, { color: theme.text }]}>Task Title</Text>
               <TextInput
                 style={[styles.input,
-                  {
-                    backgroundColor: theme.card,
-                    color: theme.text,
-                    borderColor: theme.border
-                  }
+                {
+                  backgroundColor: theme.card,
+                  color: theme.text,
+                  borderColor: theme.border
+                }
                 ]}
                 value={editedTask.title}
                 onChangeText={text => setEditedTask(prev => ({ ...prev, title: text }))}
@@ -346,11 +390,11 @@ const TaskDetailScreen = () => {
               <Text style={[styles.label, { color: theme.text }]}>Description</Text>
               <TextInput
                 style={[styles.input, styles.textArea,
-                  {
-                    backgroundColor: theme.card,
-                    color: theme.text,
-                    borderColor: theme.border
-                  }
+                {
+                  backgroundColor: theme.card,
+                  color: theme.text,
+                  borderColor: theme.border
+                }
                 ]}
                 value={editedTask.description}
                 onChangeText={text => setEditedTask(prev => ({ ...prev, description: text }))}
@@ -366,11 +410,11 @@ const TaskDetailScreen = () => {
               <Text style={[styles.label, { color: theme.text }]}>Subject</Text>
               <TextInput
                 style={[styles.input,
-                  {
-                    backgroundColor: theme.card,
-                    color: theme.text,
-                    borderColor: theme.border
-                  }
+                {
+                  backgroundColor: theme.card,
+                  color: theme.text,
+                  borderColor: theme.border
+                }
                 ]}
                 value={editedTask.subject}
                 onChangeText={text => setEditedTask(prev => ({ ...prev, subject: text }))}
@@ -447,12 +491,39 @@ const TaskDetailScreen = () => {
                 </Text>
               </TouchableOpacity>
 
+              <View style={{ marginTop: 10 }}>
+                <Text style={[styles.label, { color: theme.text }]}>Due Time (Optional)</Text>
+                <TouchableOpacity
+                  style={[styles.dateButton, { backgroundColor: theme.primaryLight }]}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={20} color={theme.primary} />
+                  <Text style={[styles.dateButtonText, { color: theme.primary }]}>
+                    {editedTask.dueTime ? formatTime(editedTask.dueTime) : 'Set time'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               {showDatePicker && (
                 <DateTimePicker
                   value={parseISO(editedTask.dueDate)}
                   mode="date"
                   display="default"
                   onChange={onDateChange}
+                />
+              )}
+
+              {showTimePicker && (
+                <DateTimePicker
+                  value={editedTask.dueTime ? (() => {
+                    const [hours, minutes] = editedTask.dueTime.split(':').map(Number);
+                    const date = new Date();
+                    date.setHours(hours, minutes, 0, 0);
+                    return date;
+                  })() : new Date()}
+                  mode="time"
+                  display="default"
+                  onChange={onTimeChange}
                 />
               )}
             </View>
@@ -559,6 +630,16 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 16,
+  },
+  timeText: {
+    fontSize: 16,
+    marginTop: 4,
+  },
+  archiveInfo: {
+    fontSize: 12,
+    marginTop: 8,
+    fontStyle: 'italic',
+    alignSelf: 'flex-start',
   },
   statusBadge: {
     paddingHorizontal: 12,

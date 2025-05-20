@@ -25,7 +25,9 @@ const AddTaskScreen = () => {
   const [subject, setSubject] = useState('');
   const [priority, setPriority] = useState('medium');
   const [dueDate, setDueDate] = useState(new Date());
+  const [dueTime, setDueTime] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Subject options
   const subjectOptions = [
@@ -39,20 +41,42 @@ const AddTaskScreen = () => {
   ];
 
   // Handle date change
-  const onDateChange = (event, selectedDate) => {
+  const onDateChange = (event: any, selectedDate?: Date) => {
     const currentDate = selectedDate || dueDate;
     setShowDatePicker(false);
     setDueDate(currentDate);
   };
 
+  // Handle time change
+  const onTimeChange = (event: any, selectedTime?: Date) => {
+    setShowTimePicker(false);
+    if (selectedTime) {
+      const hours = selectedTime.getHours();
+      const minutes = selectedTime.getMinutes();
+      const formattedHours = hours < 10 ? `0${hours}` : hours;
+      const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+      setDueTime(`${formattedHours}:${formattedMinutes}`);
+    }
+  };
+
   // Format date for display
-  const formatDate = (date) => {
+  const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  // Format time for display
+  const formatTime = (time: string) => {
+    if (!time) return 'No time set';
+
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+    return `${displayHours}:${minutes < 10 ? '0' + minutes : minutes} ${period}`;
   };
 
   // Handle task creation
@@ -68,6 +92,7 @@ const AddTaskScreen = () => {
       subject,
       priority,
       dueDate: dueDate.toISOString(),
+      dueTime: dueTime || undefined, // Include due time if set
     };
 
     addTask(newTask);
@@ -224,6 +249,62 @@ const AddTaskScreen = () => {
           )}
         </View>
 
+        <View style={styles.formGroup}>
+          <Text style={[styles.label, { color: theme.text }]}>Due Time (Optional)</Text>
+          <TouchableOpacity
+            style={[styles.dateButton, { backgroundColor: theme.primaryLight }]}
+            onPress={() => setShowTimePicker(true)}
+          >
+            <Ionicons name="time-outline" size={20} color={theme.primary} />
+            <Text style={[styles.dateText, { color: theme.primary }]}>
+              {dueTime ? formatTime(dueTime) : 'Set time'}
+            </Text>
+          </TouchableOpacity>
+
+          {showTimePicker && (
+            <DateTimePicker
+              value={dueTime ? (() => {
+                const [hours, minutes] = dueTime.split(':').map(Number);
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+              })() : new Date()}
+              mode="time"
+              display="default"
+              onChange={onTimeChange}
+            />
+          )}
+
+          <Text style={[styles.infoText, { color: theme.textSecondary }]}>
+            Note: Completed tasks that are past their due date will be automatically archived
+          </Text>
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={[styles.label, { color: theme.text }]}>Due Time (Optional)</Text>
+          <TouchableOpacity
+            style={[styles.dateButton, { backgroundColor: theme.primaryLight }]}
+            onPress={() => setShowTimePicker(true)}
+          >
+            <Ionicons name="time-outline" size={20} color={theme.primary} />
+            <Text style={[styles.dateText, { color: theme.primary }]}>{dueTime ? formatTime(dueTime) : 'Set time'}</Text>
+          </TouchableOpacity>
+
+          {showTimePicker && (
+            <DateTimePicker
+              value={dueTime ? (() => {
+                const [hours, minutes] = dueTime.split(':').map(Number);
+                const date = new Date();
+                date.setHours(hours, minutes, 0, 0);
+                return date;
+              })() : new Date()}
+              mode="time"
+              display="default"
+              onChange={onTimeChange}
+            />
+          )}
+        </View>
+
         <TouchableOpacity
           style={[styles.createButton, { backgroundColor: theme.primary }]}
           onPress={handleCreateTask}
@@ -316,6 +397,11 @@ const styles = StyleSheet.create({
   dateText: {
     marginLeft: 8,
     fontSize: 16,
+  },
+  infoText: {
+    fontSize: 12,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   createButton: {
     borderRadius: 8,

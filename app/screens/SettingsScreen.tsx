@@ -70,6 +70,7 @@ const SettingsScreen = ({ navigation }) => {
   const [autoArchive, setAutoArchive] = useState(settings.autoArchive);
   const [archiveDays, setArchiveDays] = useState(settings.archiveDays);
   const [taskRetentionWeeks, setTaskRetentionWeeks] = useState(settings.taskRetentionWeeks || 7);
+  const [taskReminderMinutes, setTaskReminderMinutes] = useState(settings.taskReminderMinutes || 5);
   const [privacyLock, setPrivacyLock] = useState(settings.privacyLock);
 
   // Define wrapper functions that only update state without auto-saving
@@ -145,6 +146,10 @@ const SettingsScreen = ({ navigation }) => {
 
   const handleTaskRetentionChange = (value: number) => {
     setTaskRetentionWeeks(value);
+  };
+
+  const handleTaskReminderMinutesChange = (value: number) => {
+    setTaskReminderMinutes(value);
   };
 
   const handlePrivacyLockChange = (value: boolean) => {
@@ -289,6 +294,7 @@ const SettingsScreen = ({ navigation }) => {
       autoArchive,
       archiveDays,
       taskRetentionWeeks,
+      taskReminderMinutes,
       privacyLock,
       enabledFilters,
       prioritizeOverdue
@@ -740,6 +746,28 @@ const SettingsScreen = ({ navigation }) => {
                 <Ionicons name="notifications-outline" size={20} color={theme.primary} />
                 <Text style={[styles.actionButtonText, { color: theme.primary }]}>Test Notifications</Text>
               </TouchableOpacity>
+
+              <View style={[styles.settingItem, { marginTop: 16 }]}>
+                <Text style={[styles.settingLabel, { color: theme.text }]}>
+                  Task Reminder Time
+                </Text>
+                <View style={styles.sliderContainer}>
+                  <Slider
+                    style={{ width: '100%', height: 40 }}
+                    minimumValue={1}
+                    maximumValue={60}
+                    step={1}
+                    value={taskReminderMinutes}
+                    onValueChange={handleTaskReminderMinutesChange}
+                    minimumTrackTintColor={theme.primary}
+                    maximumTrackTintColor={theme.border}
+                    thumbTintColor={theme.primary}
+                  />
+                  <Text style={[styles.sliderValue, { color: theme.text }]}>
+                    {taskReminderMinutes} {taskReminderMinutes === 1 ? 'minute' : 'minutes'} before due
+                  </Text>
+                </View>
+              </View>
             </>
           )}
 
@@ -787,6 +815,10 @@ const SettingsScreen = ({ navigation }) => {
               value={autoArchive}
             />
           </View>
+
+          <Text style={[styles.infoText, { color: theme.textSecondary }]}>
+            Note: Completed tasks that are past their due date will be automatically archived regardless of this setting
+          </Text>
 
           <View style={styles.settingItem}>
             <Text style={[styles.settingLabel, { color: theme.text }]}>Archive After (Days)</Text>
@@ -967,8 +999,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   slider: {
+    width: '100%',
     height: 40,
-    marginBottom: 16,
+  },
+  sliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  sliderValue: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: 'bold',
+    minWidth: 50,
+    textAlign: 'right',
   },
   toggleItem: {
     flexDirection: 'row',
@@ -1047,6 +1092,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 16,
+  },
+  infoText: {
+    fontSize: 12,
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   aboutContainer: {
     alignItems: 'center',

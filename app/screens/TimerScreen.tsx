@@ -1,12 +1,58 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as BackgroundFetch from 'expo-background-fetch';
+import * as TaskManager from 'expo-task-manager';
 import { useContext, useEffect, useRef, useState } from 'react';
-import { Animated, FlatList, Modal, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, AppState, FlatList, Modal, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProgressRing from '../components/ProgressRing';
 import TaskSelectionItem from '../components/TaskSelectionItem';
 import { AppContext } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import * as NotificationService from '../services/NotificationService';
+
+// Define background task name
+const BACKGROUND_TIMER_TASK = 'background-timer-task';
+
+// Register the background task
+TaskManager.defineTask(BACKGROUND_TIMER_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error("Background task failed:", error);
+    return BackgroundFetch.BackgroundFetchResult.Failed;
+  }
+
+  try {
+    // The data passed from the background task registration
+    const { endTime, timerMode, taskTitle } = data as {
+      endTime: number,
+      timerMode: string,
+      taskTitle?: string
+    };
+
+    // Calculate time left
+    const now = Date.now();
+    const timeLeftMs = Math.max(0, endTime - now);
+    const timeLeftSeconds = Math.floor(timeLeftMs / 1000);
+
+    // Update notification with current time left
+    if (timeLeftSeconds > 0) {
+      await NotificationService.showTimerNotification(
+        timeLeftSeconds,
+        timerMode,
+        true,
+        taskTitle
+      );
+      return BackgroundFetch.BackgroundFetchResult.NewData;
+    } else {
+      // Timer complete
+      await NotificationService.cancelTimerNotification();
+      await NotificationService.sendTimerCompletionNotification();
+      return BackgroundFetch.BackgroundFetchResult.NoData;
+    }
+  } catch (error) {
+    console.error("Error in background timer task:", error);
+    return BackgroundFetch.BackgroundFetchResult.Failed;
+  }
+});
 
 const TimerScreen = () => {
   const { theme } = useTheme();
@@ -19,6 +65,9 @@ const TimerScreen = () => {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [showTaskSelection, setShowTaskSelection] = useState(false);
   const [notificationEnabled, setNotificationEnabled] = useState(false);
+  const [backgroundTaskRegistered, setBackgroundTaskRegistered] = useState(false);
+  const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
+  const appStateRef = useRef(AppState.currentState);
   const [sessionHistory, setSessionHistory] = useState<Array<{
     duration: number;
     timestamp: string;
@@ -55,14 +104,124 @@ const TimerScreen = () => {
     }
   }, [timerMode, settings]);
 
-  // Timer logic
+  // Set up AppState change listener to track when app goes to background/foreground
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App has come to the foreground
+        if (isRunning && timerEndTime) {
+          // Sync timer with actual time passed
+          const now = Date.now();
+          const newTimeLeft = Math.max(0, Math.floor((timerEndTime - now) / 1000));
+
+          if (newTimeLeft <= 0) {
+            // Timer completed while in background
+            setTimeLeft(0);
+            handleTimerComplete();
+          } else {
+            setTimeLeft(newTimeLeft);
+          }
+        }
+      } else if (appStateRef.current === 'active' && nextAppState.match(/inactive|background/)) {
+        // App is going to the background
+        if (isRunning) {
+          // Make sure the timer notification is showing
+          NotificationService.showTimerNotification(
+            timeLeft,
+            timerMode,
+            isRunning,
+            selectedTask?.title
+          );
+        }
+      }
+
+      appStateRef.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isRunning, timerEndTime, timerMode, timeLeft, selectedTask]);
+
+  // Register or unregister background task based on timer state
+  useEffect(() => {
+    const registerBackgroundTask = async () => {
+      if (isRunning && timeLeft > 0) {
+        // Calculate when the timer will end
+        const endTime = Date.now() + timeLeft * 1000;
+        setTimerEndTime(endTime);
+
+        try {
+          // Show the notification immediately
+          await NotificationService.showTimerNotification(
+            timeLeft,
+            timerMode,
+            isRunning,
+            selectedTask?.title
+          );
+
+          // Register background task with options as data
+          await BackgroundFetch.registerTaskAsync(BACKGROUND_TIMER_TASK, {
+            minimumInterval: 15, // 15 seconds minimum
+            stopOnTerminate: false,
+            startOnBoot: true,
+            // Pass data to the background task
+            taskName: BACKGROUND_TIMER_TASK,
+            data: {
+              endTime,
+              timerMode,
+              taskTitle: selectedTask?.title,
+            }
+          });
+
+          setBackgroundTaskRegistered(true);
+        } catch (err) {
+          console.error("Failed to register background task:", err);
+        }
+      } else {
+        // Unregister background task when timer stops
+        if (backgroundTaskRegistered) {
+          try {
+            await BackgroundFetch.unregisterTaskAsync(BACKGROUND_TIMER_TASK);
+            await NotificationService.cancelTimerNotification();
+            setBackgroundTaskRegistered(false);
+            setTimerEndTime(null);
+          } catch (err) {
+            console.error("Failed to unregister background task:", err);
+          }
+        }
+      }
+    };
+
+    registerBackgroundTask();
+  }, [isRunning, timeLeft]);
+
+  // Timer logic for when app is in foreground
+  useEffect(() => {
+    let timer: number | null = null;
 
     if (isRunning && timeLeft > 0) {
+      // Calculate when the timer will end
+      if (!timerEndTime) {
+        setTimerEndTime(Date.now() + timeLeft * 1000);
+      }
+
+      // Update timer display every second
       timer = setInterval(() => {
-        setTimeLeft((prevTime) => prevTime - 1);
-      }, 1000);
+        setTimeLeft((prevTime) => {
+          const newTime = prevTime - 1;
+          // Update notification every 15 seconds or when timer gets close to completion
+          if (newTime % 15 === 0 || newTime < 10) {
+            NotificationService.showTimerNotification(
+              newTime,
+              timerMode,
+              isRunning,
+              selectedTask?.title
+            );
+          }
+          return newTime;
+        });
+      }, 1000) as unknown as number;
     } else if (isRunning && timeLeft === 0) {
       handleTimerComplete();
     }
@@ -74,18 +233,36 @@ const TimerScreen = () => {
 
   const handleTimerComplete = () => {
     setIsRunning(false);
+    setTimerEndTime(null);
+
+    // Clean up background timer tasks
+    (async () => {
+      if (backgroundTaskRegistered) {
+        try {
+          await BackgroundFetch.unregisterTaskAsync(BACKGROUND_TIMER_TASK);
+          setBackgroundTaskRegistered(false);
+        } catch (err) {
+          console.error("Error unregistering background task:", err);
+        }
+      }
+    })();
 
     // Play sound or vibration here
 
-    // Show notification if enabled
-    if (notificationEnabled) {
-      const notificationTitle = timerMode === 'pomodoro' ? 'Focus Session Complete' : 'Break Time Over';
-      const notificationBody = timerMode === 'pomodoro'
-        ? 'Great job! Your focus session is complete.'
-        : 'Break time is over. Ready to focus again?';
+    // Cancel ongoing notification and show completion notification
+    (async () => {
+      await NotificationService.cancelTimerNotification();
 
-      NotificationService.sendTimerCompletionNotification(notificationTitle, notificationBody);
-    }
+      // Show completion notification if enabled
+      if (notificationEnabled) {
+        const notificationTitle = timerMode === 'pomodoro' ? 'Focus Session Complete' : 'Break Time Over';
+        const notificationBody = timerMode === 'pomodoro'
+          ? 'Great job! Your focus session is complete.'
+          : 'Break time is over. Ready to focus again?';
+
+        await NotificationService.sendTimerCompletionNotification(notificationTitle, notificationBody);
+      }
+    })();
 
     // Record session if it was a pomodoro
     if (timerMode === 'pomodoro') {
@@ -140,7 +317,27 @@ const TimerScreen = () => {
   };
 
   const toggleTimer = () => {
-    setIsRunning(!isRunning);
+    const newIsRunning = !isRunning;
+    setIsRunning(newIsRunning);
+
+    // Handle notification based on timer state
+    if (newIsRunning) {
+      // Starting timer - show notification
+      NotificationService.showTimerNotification(
+        timeLeft,
+        timerMode,
+        true,
+        selectedTask?.title
+      );
+    } else {
+      // Pausing timer - update notification to show paused state
+      NotificationService.showTimerNotification(
+        timeLeft,
+        timerMode,
+        false,
+        selectedTask?.title
+      );
+    }
 
     // Animation for button press
     Animated.sequence([
@@ -159,16 +356,36 @@ const TimerScreen = () => {
 
   const resetTimer = () => {
     setIsRunning(false);
+    setTimerEndTime(null);
 
+    // Cancel any ongoing background task and notifications
+    (async () => {
+      if (backgroundTaskRegistered) {
+        try {
+          await BackgroundFetch.unregisterTaskAsync(BACKGROUND_TIMER_TASK);
+          setBackgroundTaskRegistered(false);
+        } catch (err) {
+          console.error("Error unregistering background task:", err);
+        }
+      }
+
+      await NotificationService.cancelTimerNotification();
+    })();
+
+    // Reset timer based on mode
+    let newTimeLeft = 0;
     switch (timerMode) {
       case 'pomodoro':
-        setTimeLeft(settings.pomodoroLength * 60);
+        newTimeLeft = settings.pomodoroLength * 60;
+        setTimeLeft(newTimeLeft);
         break;
       case 'shortBreak':
-        setTimeLeft(settings.shortBreakLength * 60);
+        newTimeLeft = settings.shortBreakLength * 60;
+        setTimeLeft(newTimeLeft);
         break;
       case 'longBreak':
-        setTimeLeft(settings.longBreakLength * 60);
+        newTimeLeft = settings.longBreakLength * 60;
+        setTimeLeft(newTimeLeft);
         break;
     }
   };
@@ -221,6 +438,23 @@ const TimerScreen = () => {
     setSelectedTask(task);
     setShowTaskSelection(false);
   };
+
+  // Clean up notifications and background tasks on component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up function for when component unmounts
+      (async () => {
+        try {
+          if (backgroundTaskRegistered) {
+            await BackgroundFetch.unregisterTaskAsync(BACKGROUND_TIMER_TASK);
+          }
+          await NotificationService.cancelTimerNotification();
+        } catch (err) {
+          console.error("Error cleaning up timer resources:", err);
+        }
+      })();
+    };
+  }, [backgroundTaskRegistered]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -288,6 +522,7 @@ const TimerScreen = () => {
           progress={calculateProgress()}
           size={300}
           strokeWidth={20}
+          textColor={theme.text}
           progressColor={getTimerColor()}
           backgroundColor={`${getTimerColor()}20`}
           showPercentage={false}
@@ -404,6 +639,7 @@ const TimerScreen = () => {
               renderItem={({ item }) => (
                 <TaskSelectionItem
                   task={item}
+                  isSelected={selectedTask?.id === item.id}
                   onSelect={() => handleSelectTask(item)}
                   theme={theme}
                 />
