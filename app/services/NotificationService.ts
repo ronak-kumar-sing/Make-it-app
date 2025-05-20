@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { registerBackgroundNotificationHandler } from './BackgroundNotificationHandler';
 import { isUsingExpoGo, showNotificationLimitationsWarning } from './NotificationWarning';
+import { registerBackgroundNotificationHandler } from './BackgroundNotificationHandler';
 
 // Define notification types
 export const NOTIFICATION_TYPES = {
@@ -32,22 +32,6 @@ type Exam = {
   subject?: string;
   completed?: boolean;
 };
-
-// Type definitions for notifications
-export interface NotificationData extends Record<string, unknown> {
-  type: keyof typeof NOTIFICATION_TYPES;
-  taskId?: string;
-  examId?: string;
-  timerId?: string;
-  timeLeft?: number;
-}
-
-// Type for timer state
-interface TimerState {
-  timeLeft: number;
-  isPaused: boolean;
-  lastUpdated: number;
-}
 
 // Configure foreground notification handling
 Notifications.setNotificationHandler({
@@ -251,76 +235,6 @@ export const scheduleExamReminder = async (exam: Exam) => {
   }
 };
 
-// Schedule a persistent timer notification
-export const schedulePersistentTimerNotification = async (
-  timeLeft: number,
-  title: string = 'Timer Running',
-  timerId: string,
-  isPaused: boolean = false
-) => {
-  try {
-    const notificationId = `timer-${timerId}`;
-
-    // Store timer state
-    const timerState: TimerState = {
-      timeLeft,
-      isPaused,
-      lastUpdated: Date.now()
-    };
-    await AsyncStorage.setItem(`timerState:${timerId}`, JSON.stringify(timerState));
-
-    // For Android, ensure we're using the persistent channel
-    const androidConfig = Platform.OS === 'android' ? {
-      channelId: 'persistent',
-    } : undefined;
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body: isPaused ?
-          'Timer is paused. Open app to resume.' :
-          `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')} remaining`,
-        data: {
-          type: NOTIFICATION_TYPES.TIMER_COMPLETED,
-          timerId,
-          timeLeft
-        } as NotificationData,
-        sound: false,
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        ...androidConfig,
-      },
-      trigger: null,
-      identifier: notificationId
-    });
-
-    return notificationId;
-  } catch (error) {
-    console.error('Error scheduling persistent timer notification:', error);
-    return null;
-  }
-};
-
-// Update or remove persistent timer notification
-export const updatePersistentTimerNotification = async (
-  timerId: string,
-  timeLeft?: number,
-  isPaused?: boolean
-) => {
-  try {
-    const notificationId = `timer-${timerId}`;
-    if (timeLeft === undefined) {
-      // Remove the notification
-      await Notifications.cancelScheduledNotificationAsync(notificationId);
-      await AsyncStorage.removeItem(`timerState:${timerId}`);
-    } else {
-      // Update the notification
-      await schedulePersistentTimerNotification(timeLeft, undefined, timerId, isPaused);
-    }
-  } catch (error) {
-    console.error('Error updating persistent timer notification:', error);
-  }
-};
-
 // Cancel notifications
 export const cancelTaskNotification = async (taskId: string) => {
   try {
@@ -383,14 +297,14 @@ export const initializeNotifications = async (
   if (!enabled) return;
 
   try {
+    // Initialize background handler
+    await registerBackgroundNotificationHandler();
+
     // Initialize Android channels
     await initializeAndroidChannels();
 
     // Check permissions
     if (!await requestNotificationPermissions()) return;
-
-    // Initialize background handlers
-    await registerBackgroundNotificationHandler();
 
     // Schedule notifications
     const promises = [
@@ -403,24 +317,6 @@ export const initializeNotifications = async (
     ];
 
     await Promise.all(promises);
-
-    // Restore any active timer notifications
-    const keys = await AsyncStorage.getAllKeys();
-    const timerKeys = keys.filter(key => key.startsWith('timerState:'));
-
-    for (const key of timerKeys) {
-      const timerStateStr = await AsyncStorage.getItem(key);
-      if (!timerStateStr) continue;
-
-      const timerState = JSON.parse(timerStateStr);
-      const timerId = key.replace('timerState:', '');
-      await schedulePersistentTimerNotification(
-        timerState.timeLeft,
-        'Timer Running',
-        timerId,
-        timerState.isPaused
-      );
-    }
   } catch (error) {
     console.error('Error initializing notifications:', error);
   }
@@ -431,6 +327,4 @@ export default {
   scheduleTaskNotification,
   scheduleExamReminder,
   sendTimerCompletionNotification,
-  schedulePersistentTimerNotification,
-  updatePersistentTimerNotification,
 };

@@ -1,17 +1,7 @@
+import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import {
-  addNotificationReceivedListener,
-  addNotificationResponseReceivedListener,
-  createFallbackNotification,
-  dismissAllNotifications,
-  scheduleCalendarNotification,
-  scheduleDelayedNotification,
-  scheduleRecurringNotification,
-  sendImmediateNotification,
-  showInAppNotification
-} from '../services/NotificationAlternatives';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { isUsingExpoGo } from '../services/NotificationWarning';
 
 interface NotificationTesterProps {
@@ -55,6 +45,196 @@ const NotificationTester: React.FC<NotificationTesterProps> = ({ theme }) => {
     setPermissionStatus(status);
   };
 
+  // Send an immediate notification
+  const sendImmediateNotification = async (
+    title: string,
+    body: string,
+    data: Record<string, any> = {}
+  ): Promise<string | null> => {
+    try {
+      if (!Device.isDevice) {
+        console.log('Cannot send notifications on simulator/emulator');
+        return null;
+      }
+
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Notification permission not granted');
+        return null;
+      }
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data,
+        },
+        trigger: null, // null trigger means show immediately
+      });
+
+      return notificationId;
+    } catch (error) {
+      console.error('Error sending immediate notification:', error);
+      return null;
+    }
+  };
+
+  // Schedule a notification with delay
+  const scheduleDelayedNotification = async (
+    title: string,
+    body: string,
+    delayInSeconds: number = 5,
+    data: Record<string, any> = {}
+  ): Promise<string | null> => {
+    try {
+      if (!Device.isDevice) {
+        console.log('Cannot schedule notifications on simulator/emulator');
+        return null;
+      }
+
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Notification permission not granted');
+        return null;
+      }
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data,
+        },
+        trigger: {
+          seconds: delayInSeconds,
+          type: 'timeInterval',
+        },
+      });
+
+      return notificationId;
+    } catch (error) {
+      console.error('Error scheduling delayed notification:', error);
+      return null;
+    }
+  };
+
+  // Schedule a calendar notification with correct type
+  const scheduleCalendarNotification = async (
+    title: string,
+    body: string,
+    date: Date,
+    data: Record<string, any> = {}
+  ): Promise<string | null> => {
+    try {
+      if (!Device.isDevice) {
+        console.log('Cannot schedule notifications on simulator/emulator');
+        return null;
+      }
+
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Notification permission not granted');
+        return null;
+      }
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data,
+        },
+        trigger: {
+          type: 'calendar',
+          year: date.getFullYear(),
+          month: date.getMonth() + 1, // months are 0-indexed in JS but 1-indexed in expo-notifications
+          day: date.getDate(),
+          hour: date.getHours(),
+          minute: date.getMinutes(),
+          repeats: false,
+        },
+      });
+
+      return notificationId;
+    } catch (error) {
+      console.error('Error scheduling calendar notification:', error);
+      return null;
+    }
+  };
+
+  // Schedule a recurring notification with correct type
+  const scheduleRecurringNotification = async (
+    title: string,
+    body: string,
+    hour: number,
+    minute: number,
+    data: Record<string, any> = {}
+  ): Promise<string | null> => {
+    try {
+      if (!Device.isDevice) {
+        console.log('Cannot schedule notifications on simulator/emulator');
+        return null;
+      }
+
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Notification permission not granted');
+        return null;
+      }
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data,
+        },
+        trigger: {
+          type: 'calendar',
+          hour,
+          minute,
+          repeats: true,
+        },
+      });
+
+      return notificationId;
+    } catch (error) {
+      console.error('Error scheduling recurring notification:', error);
+      return null;
+    }
+  };
+
+  // Show in-app notification using Alert
+  const showInAppNotification = (title: string, message: string) => {
+    Alert.alert(
+      title,
+      message,
+      [{ text: 'OK' }],
+      { cancelable: true }
+    );
+  };
+
+  // Create fallback notification based on environment
+  const createFallbackNotification = async (
+    title: string,
+    body: string,
+    data: Record<string, any> = {}
+  ) => {
+    if (Platform.OS === 'android' && isExpoGoEnvironment) {
+      showInAppNotification(title, body);
+      return 'in-app-fallback';
+    } else {
+      return sendImmediateNotification(title, body, data);
+    }
+  };
+
+  // Dismiss all notifications
+  const dismissAllNotifications = async () => {
+    await Notifications.dismissAllNotificationsAsync();
+  };
+
+  // Add notification listeners
+  const addNotificationReceivedListener = Notifications.addNotificationReceivedListener;
+  const addNotificationResponseReceivedListener = Notifications.addNotificationResponseReceivedListener;
+
+  // Handler functions that use the utility functions
   const handleImmediateNotification = async () => {
     const notificationId = await sendImmediateNotification(
       'Immediate Notification',
@@ -68,12 +248,18 @@ const NotificationTester: React.FC<NotificationTesterProps> = ({ theme }) => {
     }
   };
 
+  // Handler functions with correct trigger types
   const handleDelayedNotification = async () => {
-    const notificationId = await scheduleDelayedNotification(
-      'Delayed Notification',
-      'This notification appears after 5 seconds!',
-      5
-    );
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Delayed Notification',
+        body: 'This notification appears after 5 seconds!',
+      },
+      trigger: {
+        seconds: 5,
+        type: 'timeInterval'
+      },
+    } as any);
 
     if (notificationId) {
       setLastNotification(`Scheduled notification ID: ${notificationId} (in 5 seconds)`);
@@ -86,11 +272,16 @@ const NotificationTester: React.FC<NotificationTesterProps> = ({ theme }) => {
     const date = new Date();
     date.setMinutes(date.getMinutes() + 1); // 1 minute from now
 
-    const notificationId = await scheduleCalendarNotification(
-      'Calendar Notification',
-      `This notification appears at ${date.toLocaleTimeString()}!`,
-      date
-    );
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Calendar Notification',
+        body: `This notification appears at ${date.toLocaleTimeString()}!`,
+      },
+      trigger: {
+        date: date,
+        type: 'date'
+      } as any,
+    });
 
     if (notificationId) {
       setLastNotification(`Scheduled notification ID: ${notificationId} for ${date.toLocaleTimeString()}`);
@@ -103,12 +294,18 @@ const NotificationTester: React.FC<NotificationTesterProps> = ({ theme }) => {
     const now = new Date();
     const minute = (now.getMinutes() + 1) % 60; // Next minute, wrapping around 60
 
-    const notificationId = await scheduleRecurringNotification(
-      'Daily Notification',
-      `This notification appears daily at ${now.getHours()}:${minute}!`,
-      now.getHours(),
-      minute
-    );
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Daily Notification',
+        body: `This notification appears daily at ${now.getHours()}:${minute}!`,
+      },
+      trigger: {
+        hour: now.getHours(),
+        minute: minute,
+        repeats: true,
+        type: 'daily'
+      } as any,
+    });
 
     if (notificationId) {
       setLastNotification(`Scheduled daily notification ID: ${notificationId} for ${now.getHours()}:${minute}`);
