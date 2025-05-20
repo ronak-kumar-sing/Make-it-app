@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Animated, AppState, FlatList, Modal, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, AppState, AppStateStatus, FlatList, Modal, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native'; // Added AppStateStatus
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProgressRing from '../components/ProgressRing';
 import TaskSelectionItem from '../components/TaskSelectionItem';
@@ -14,7 +14,14 @@ import {
   registerTimerBackgroundTask,
   unregisterTimerBackgroundTask
 } from '../services/TimerBackgroundTask';
-import { cancelTimerNotification, sendTimerCompletionNotification, showTimerNotification } from '../services/TimerNotification';
+// Corrected import path
+import { cancelTimerNotification, sendTimerCompletionNotification, showTimerNotification } from '../services/NotificationService';
+
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+};
 
 const TimerScreen = () => {
   const { theme } = useTheme();
@@ -28,7 +35,9 @@ const TimerScreen = () => {
   const [showTaskSelection, setShowTaskSelection] = useState(false);
   const [notificationEnabled, setNotificationEnabled] = useState(false);
   const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
-  const appStateRef = useRef(AppState.currentState);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState); // Correctly typed
+  const [currentNotificationId, setCurrentNotificationId] = useState<string | null>(null); // Added state for notification ID
+
   const [sessionHistory, setSessionHistory] = useState<Array<{
     duration: number;
     timestamp: string;
@@ -70,24 +79,24 @@ const TimerScreen = () => {
     let timer: number | null = null;
 
     if (isRunning && timeLeft > 0) {
-      // Calculate when the timer will end
       if (!timerEndTime) {
         setTimerEndTime(Date.now() + timeLeft * 1000);
       }
 
-      // Update timer display every second
       timer = setInterval(() => {
         setTimeLeft((prevTime) => {
           const newTime = prevTime - 1;
-          // Update notification every 15 seconds or when timer gets close to completion
           if (newTime % 15 === 0 || newTime < 10) {
             (async () => {
-              await showTimerNotification(
-                newTime,
-                timerMode,
-                isRunning,
-                selectedTask?.title
-              );
+              if (currentNotificationId) { // Cancel previous before showing new
+                await cancelTimerNotification(currentNotificationId);
+              }
+              const title = `${timerMode === 'pomodoro' ? (selectedTask?.title || 'Focus') : (timerMode === 'shortBreak' ? 'Short Break' : 'Long Break')} Timer`;
+              const body = `Time remaining: ${formatTime(newTime)}`;
+              const newNotificationId = await showTimerNotification(title, body);
+              if (newNotificationId) {
+                setCurrentNotificationId(newNotificationId);
+              }
             })();
           }
           return newTime;
@@ -100,20 +109,21 @@ const TimerScreen = () => {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isRunning, timeLeft]); // timerEndTime removed as it's set by toggleTimer or AppState
+  }, [isRunning, timeLeft, timerMode, selectedTask, currentNotificationId]); // Added dependencies
 
-  const handleTimerComplete = useCallback(async () => { // Make async and wrap with useCallback
+  const handleTimerComplete = useCallback(async () => {
     console.log('handleTimerComplete called. Current timerMode:', timerMode, 'isRunning state variable before setIsRunning(false): ', isRunning);
     setIsRunning(false);
     setTimerEndTime(null);
 
-    // Clean up background timer tasks and state
     await unregisterTimerBackgroundTask();
-    await clearTimerState(); // Clear state from AsyncStorage
+    await clearTimerState();
     console.log('handleTimerComplete: Background task unregistered and timer state cleared.');
 
-    // Cancel ongoing notification and show completion notification
-    await cancelTimerNotification();
+    if (currentNotificationId) {
+      await cancelTimerNotification(currentNotificationId);
+      setCurrentNotificationId(null);
+    }
 
     if (notificationEnabled) {
       const notificationTitle = timerMode === 'pomodoro' ? 'Focus Session Complete' : 'Break Time Over';
@@ -202,8 +212,8 @@ const TimerScreen = () => {
 
       if (state) {
         const initialTimerMode = state.timerMode as 'pomodoro' | 'shortBreak' | 'longBreak';
-        // Set timerMode first, as other logic might depend on it (e.g., handleTimerComplete, default timeLeft)
         setTimerMode(initialTimerMode);
+        setCurrentNotificationId(state.notificationId || null); // Restore notificationId
 
         if (state.isRunning && state.endTime) { // Ensure endTime is present for running state
           const now = Date.now();
@@ -269,7 +279,7 @@ const TimerScreen = () => {
       }
     };
 
-    const handleAppStateChange = async (nextAppState: string) => {
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => { // Correctly typed
       const currentAppState = appStateRef.current;
       appStateRef.current = nextAppState;
 
@@ -286,19 +296,20 @@ const TimerScreen = () => {
             isRunning: true,
             timerMode,
             taskTitle: selectedTask?.title,
+            notificationId: currentNotificationId, // Save notificationId
           });
           await registerTimerBackgroundTask();
           console.log('Background: Timer state saved and background task registered.');
         } else if (!isRunning && timeLeft > 0) { // Timer is paused with time left
           console.log('Background: Saving paused timer state');
           await initializeTimerState({
-            endTime: null, // No fixed end time for paused state
+            endTime: null,
             timeLeft,
             isRunning: false,
             timerMode,
             taskTitle: selectedTask?.title,
+            notificationId: currentNotificationId, // Save notificationId
           });
-          // No background task for paused timers
           console.log('Background: Paused timer state saved. No background task.');
         } else {
           console.log('Background: Timer not in a state to be saved for background (e.g. stopped, completed, or running with no time left).');
@@ -329,23 +340,26 @@ const TimerScreen = () => {
     if (isRunning && timeLeft > 0) {
       (async () => {
         console.log(`NotificationEffect: Timer is running (timeLeft: ${timeLeft}, mode: ${timerMode}). Showing/Updating notification.`);
-        await showTimerNotification(
-          timeLeft, // Pass current timeLeft for accurate content
-          timerMode,
-          true, // isRunning is true here
-          selectedTask?.title
-        );
+        if (currentNotificationId) { // Cancel previous before showing new
+          await cancelTimerNotification(currentNotificationId);
+        }
+        const title = `${timerMode === 'pomodoro' ? (selectedTask?.title || 'Focus') : (timerMode === 'shortBreak' ? 'Short Break' : 'Long Break')} Timer`;
+        const body = `Time remaining: ${formatTime(timeLeft)}`;
+        const newNotificationId = await showTimerNotification(title, body);
+        if (newNotificationId) {
+          setCurrentNotificationId(newNotificationId);
+        }
       })();
     } else if (!isRunning) {
       (async () => {
         console.log('NotificationEffect: Timer is not running. Cancelling notification.');
-        await cancelTimerNotification();
+        if (currentNotificationId) {
+          await cancelTimerNotification(currentNotificationId);
+          setCurrentNotificationId(null);
+        }
       })();
     }
-    // Dependencies: isRunning (to trigger start/stop), timerMode/selectedTask (to update if they change while running).
-    // timeLeft is NOT a direct dependency to avoid updates every second from this effect.
-    // However, the `timeLeft` variable used inside IS from the outer scope, so it's current when the effect runs.
-  }, [isRunning, timerMode, selectedTask]);
+  }, [isRunning, timerMode, selectedTask, timeLeft]); // Added timeLeft
 
   const toggleTimer = async () => {
     const newIsRunning = !isRunning;
@@ -370,37 +384,51 @@ const TimerScreen = () => {
       setTimerEndTime(currentTimerEndTime);
 
       console.log(`toggleTimer: Starting/Resuming. timeLeft: ${timeLeft}, new endTime: ${currentTimerEndTime}`);
+      // Show notification when timer starts/resumes
+      if (currentNotificationId) { await cancelTimerNotification(currentNotificationId); }
+      const title = `${timerMode === 'pomodoro' ? (selectedTask?.title || 'Focus') : (timerMode === 'shortBreak' ? 'Short Break' : 'Long Break')} Timer`;
+      const body = `Time remaining: ${formatTime(timeLeft)}`;
+      const newNotificationId = await showTimerNotification(title, body);
+      setCurrentNotificationId(newNotificationId);
+
       await initializeTimerState({
         endTime: currentTimerEndTime!,
         timeLeft,
         isRunning: true,
         timerMode,
         taskTitle: selectedTask?.title,
+        notificationId: newNotificationId, // Save new notificationId
       });
       await registerTimerBackgroundTask();
     } else {
       // Timer is being paused
       console.log(`toggleTimer: Pausing. timeLeft: ${timeLeft}`);
-      setTimerEndTime(null); // Important for paused state
+      setTimerEndTime(null);
       await unregisterTimerBackgroundTask();
-      await cancelTimerNotification();
-      await initializeTimerState({ // Save paused state
+      if (currentNotificationId) {
+        await cancelTimerNotification(currentNotificationId);
+        setCurrentNotificationId(null);
+      }
+      await initializeTimerState({
         endTime: null,
         timeLeft,
         isRunning: false,
         timerMode,
         taskTitle: selectedTask?.title,
+        notificationId: null, // Clear notificationId when paused
       });
       console.log('toggleTimer: Paused state saved to AsyncStorage.');
     }
   };
 
-  const resetTimer = async () => { // Make async
+  const resetTimer = async () => {
     setIsRunning(false);
     setTimerEndTime(null);
-
+    if (currentNotificationId) {
+      await cancelTimerNotification(currentNotificationId);
+      setCurrentNotificationId(null);
+    }
     await unregisterTimerBackgroundTask();
-    await cancelTimerNotification();
     await clearTimerState(); // Clear state from AsyncStorage
 
     // Reset timer based on mode
@@ -421,51 +449,36 @@ const TimerScreen = () => {
     }
   };
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const calculateProgress = (): number => {
-    let totalTime;
-
-    switch (timerMode) {
-      case 'pomodoro':
-        totalTime = settings.pomodoroLength * 60;
-        break;
-      case 'shortBreak':
-        totalTime = settings.shortBreakLength * 60;
-        break;
-      case 'longBreak':
-        totalTime = settings.longBreakLength * 60;
-        break;
-      default:
-        totalTime = settings.pomodoroLength * 60;
+  const skipTimer = async () => {
+    setIsRunning(false);
+    setTimerEndTime(null);
+    if (currentNotificationId) {
+      await cancelTimerNotification(currentNotificationId);
+      setCurrentNotificationId(null);
     }
-
-    const progress = 1 - (timeLeft / totalTime);
-    return progress;
-  };
-
-  const getTimerColor = () => {
+    // Determine next timer mode
+    if (completedPomodoros < settings.longBreakInterval) {
+      setTimerMode('shortBreak');
+      console.log('skipTimer: Switched to shortBreak mode.');
+    } else {
+      setTimerMode('longBreak');
+      console.log('skipTimer: Switched to longBreak mode, reset completed pomodoros.');
+    }
+    // Reset timeLeft to new mode's duration
     switch (timerMode) {
       case 'pomodoro':
-        return theme.primary;
+        setTimeLeft(settings.pomodoroLength * 60);
+        break;
       case 'shortBreak':
-        return theme.success;
+        setTimeLeft(settings.shortBreakLength * 60);
+        break;
       case 'longBreak':
-        return theme.warning;
-      default:
-        return theme.primary;
+        setTimeLeft(settings.longBreakLength * 60);
+        break;
     }
   };
 
-  const openTaskSelection = () => {
-    setShowTaskSelection(true);
-  };
-
-  const handleSelectTask = (task: any) => {
+  const selectTask = (task: any) => {
     setSelectedTask(task);
     setShowTaskSelection(false);
   };
@@ -690,158 +703,96 @@ const TimerScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    padding: 16,
     alignItems: 'center',
+    justifyContent: 'space-between', // Adjusted for better layout
+    padding: 20,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  modeSelection: {
+  headerContainer: {
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: 16,
-    marginBottom: 24,
+    alignItems: 'center',
+    marginBottom: 20, // Added margin
   },
   modeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-  },
-  activeMode: {
-    backgroundColor: '#6C63FF',
+    paddingVertical: 10, // Increased padding
+    paddingHorizontal: 15, // Increased padding
+    borderRadius: 20, // Rounded corners
   },
   modeButtonText: {
-    fontWeight: '500',
+    fontSize: 16, // Slightly larger text
+    fontWeight: 'bold', // Bold text
   },
   timerContainer: {
     alignItems: 'center',
-    marginVertical: 20,
-  },
-  timerText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-  },
-  timerLabel: {
-    fontSize: 16,
-    marginTop: 8,
-  },
-  controlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-  },
-  resetButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
     justifyContent: 'center',
+    flex: 1, // Allow timer to take more space
+  },
+  taskInfoContainer: {
     alignItems: 'center',
+    marginBottom: 20, // Added margin
   },
-  toggleButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+  taskText: {
+    fontSize: 18,
+    fontWeight: '600', // Semi-bold
+    marginBottom: 5, // Spacing
   },
-  sessionsContainer: {
-    alignItems: 'center',
-  },
-  sessionsCount: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  sessionsLabel: {
-    fontSize: 12,
-  },
-  taskSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  selectedTaskCard: {
-    padding: 16,
-    borderRadius: 8,
-  },
-  selectedTaskTitle: {
+  noTaskText: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  taskMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  taskMetaText: {
-    fontSize: 14,
-    marginLeft: 4,
-  },
-  changeTaskButton: {
-    alignItems: 'flex-end',
+    fontStyle: 'italic', // Italic for placeholder
   },
   selectTaskButton: {
-    padding: 16,
-    borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 15,
   },
-  selectTaskText: {
-    marginLeft: 8,
+  selectTaskButtonText: {
+    fontSize: 14,
     fontWeight: '500',
   },
-  historySection: {
-    padding: 20,
-  },
-  historyCard: {
-    padding: 16,
-    borderRadius: 8,
-  },
-  historyRow: {
+  controlsContainer: {
+    width: '100%',
     flexDirection: 'row',
+    justifyContent: 'space-around', // Space out controls
     alignItems: 'center',
-    marginVertical: 4,
+    marginBottom: 30, // Margin at the bottom
   },
-  historyText: {
-    marginLeft: 8,
+  controlButton: {
+    padding: 15, // Uniform padding
+    borderRadius: 30, // Circular buttons
+    marginHorizontal: 10, // Spacing between buttons
   },
-  modalOverlay: {
+  // Removed startButton as it's covered by controlButton with dynamic styling
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)', // Semi-transparent background
   },
   modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '70%',
+    width: '90%', // Responsive width
+    maxHeight: '80%', // Max height
     padding: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    borderRadius: 10, // Rounded corners
+    elevation: 5, // Shadow for Android
+    shadowColor: '#000', // Shadow for iOS
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20, // Larger title
     fontWeight: 'bold',
+    marginBottom: 15, // Spacing
+    textAlign: 'center', // Center title
   },
-  emptyList: {
-    padding: 20,
-    alignItems: 'center',
+  closeButton: {
+    alignSelf: 'flex-end', // Position close button
+    padding: 5,
   },
-  emptyListText: {
-    textAlign: 'center',
-  },
+  // Added styles for ProgressRing and TaskSelectionItem if needed,
+  // but assuming they have their own internal styling.
 });
 
 export default TimerScreen;

@@ -280,10 +280,40 @@ export const sendTimerCompletionNotification = async (title = 'Timer Complete', 
         data: { type: NOTIFICATION_TYPES.TIMER_COMPLETED },
         sound: true,
       },
-      trigger: null,
+      trigger: null, // Ensures immediate display
     });
   } catch (error) {
     console.error('Error sending timer completion notification:', error);
+  }
+};
+
+// Show a timer notification
+export const showTimerNotification = async (title: string, body: string): Promise<string | null> => {
+  try {
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        data: { type: 'TIMER_PROGRESS' }, // Or a relevant type
+        sound: false, // Typically ongoing notifications are silent
+        autoDismiss: false, // Keep it visible
+        categoryIdentifier: 'timer', // Ensure it uses the timer channel
+      },
+      trigger: null, // Immediate
+    });
+    return notificationId;
+  } catch (error) {
+    console.error('Error showing timer notification:', error);
+    return null;
+  }
+};
+
+// Cancel a specific timer notification
+export const cancelTimerNotification = async (notificationId: string): Promise<void> => {
+  try {
+    await Notifications.cancelScheduledNotificationAsync(notificationId);
+  } catch (error) {
+    console.error('Error canceling timer notification:', error);
   }
 };
 
@@ -327,4 +357,11 @@ export default {
   scheduleTaskNotification,
   scheduleExamReminder,
   sendTimerCompletionNotification,
+  showTimerNotification,
+  cancelTimerNotification,
+  areNotificationsAvailable,
+  requestNotificationPermissions,
+  cancelTaskNotification,
+  cancelExamReminder,
+  NOTIFICATION_TYPES,
 };

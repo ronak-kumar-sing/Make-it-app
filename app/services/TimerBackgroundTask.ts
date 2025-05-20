@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
-import { cancelTimerNotification, sendTimerCompletionNotification, showTimerNotification } from './TimerNotification';
+import { cancelTimerNotification, sendTimerCompletionNotification, showTimerNotification } from './NotificationService';
 
 // Constants
 export const TIMER_BACKGROUND_TASK = 'TIMER_BACKGROUND_TASK';
@@ -9,20 +9,22 @@ const TIMER_STATE_KEY = 'timerState';
 
 // Types
 interface TimerState {
-  endTime: number;
+  endTime: number | null; // Allow null for paused state
   timeLeft: number;
   isRunning: boolean;
   timerMode: string;
   taskTitle?: string;
   lastUpdateTime: number;
+  notificationId?: string | null; // Added to store active notification ID
 }
 
 // Initialize the timer state in AsyncStorage
-export const initializeTimerState = async (timerState: Omit<TimerState, 'lastUpdateTime'>) => {
+export const initializeTimerState = async (timerState: Omit<TimerState, 'lastUpdateTime'>) => { // Omit notificationId if it's managed internally or passed differently
   try {
     const state: TimerState = {
       ...timerState,
-      lastUpdateTime: Date.now()
+      lastUpdateTime: Date.now(),
+      // notificationId: timerState.notificationId || null, // Ensure it's part of the state if passed
     };
     await AsyncStorage.setItem('timerState', JSON.stringify(state));
   } catch (error) {
@@ -77,6 +79,11 @@ TaskManager.defineTask(TIMER_BACKGROUND_TASK, async ({ data, error, executionInf
   try {
     const timerState = await getTimerState();
     if (!timerState || !timerState.isRunning) {
+      // If no active timer state or timer is not running, cancel any lingering notification
+      if (timerState?.notificationId) {
+        await cancelTimerNotification(timerState.notificationId);
+        await updateTimerState({ notificationId: null }); // Clear it from state
+      }
       return BackgroundFetch.BackgroundFetchResult.NoData;
     }
 
@@ -85,33 +92,36 @@ TaskManager.defineTask(TIMER_BACKGROUND_TASK, async ({ data, error, executionInf
     const timePassed = Math.floor((now - timerState.lastUpdateTime) / 1000);
     const newTimeLeft = Math.max(0, timerState.timeLeft - timePassed);
 
-    // Update timer state
+    // Update timer state (including lastUpdateTime)
     await updateTimerState({
       timeLeft: newTimeLeft,
-      lastUpdateTime: now // lastUpdateTime is updated by updateTimerState itself
+      // notificationId will be updated below if necessary
     });
 
     if (newTimeLeft <= 0) {
       // Timer completed
-      // Update state to reflect completion, but don't clear it yet.
-      // TimerScreen.handleTimerComplete will call clearTimerState.
       await updateTimerState({
         timeLeft: 0,
         isRunning: false,
-        // endTime remains the same (past time)
-        // lastUpdateTime will be updated by updateTimerState
+        notificationId: null, // Clear notification ID on completion
       });
-      await cancelTimerNotification(); // Cancel ongoing notification
+
+      if (timerState.notificationId) {
+        await cancelTimerNotification(timerState.notificationId); // Cancel ongoing notification
+      }
       await sendTimerCompletionNotification(); // Send completion notification
       return BackgroundFetch.BackgroundFetchResult.NewData;
     } else {
       // Update notification
-      await showTimerNotification(
-        newTimeLeft,
-        timerState.timerMode,
-        timerState.isRunning,
-        timerState.taskTitle
-      );
+      // Cancel previous notification before showing a new one to prevent duplicates
+      if (timerState.notificationId) {
+        await cancelTimerNotification(timerState.notificationId);
+      }
+      const title = `${timerState.timerMode === 'pomodoro' ? (timerState.taskTitle || 'Focus') : (timerState.timerMode === 'shortBreak' ? 'Short Break' : 'Long Break')} Timer`;
+      const body = `Time remaining: ${Math.floor(newTimeLeft / 60)}:${(newTimeLeft % 60).toString().padStart(2, '0')}`;
+      const newNotificationId = await showTimerNotification(title, body);
+      await updateTimerState({ notificationId: newNotificationId }); // Store new notification ID
+
       return BackgroundFetch.BackgroundFetchResult.NewData;
     }
   } catch (error) {
