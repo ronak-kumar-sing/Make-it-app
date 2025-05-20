@@ -1,8 +1,8 @@
+import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import NotificationTester from '../components/NotificationTester';
 import { useTheme } from '../context/ThemeContext';
-import { setupStandardNotifications } from '../services/NotificationAlternatives';
 import * as NotificationService from '../services/NotificationService';
 
 export default function NotificationDemoScreen() {
@@ -13,7 +13,13 @@ export default function NotificationDemoScreen() {
   useEffect(() => {
     const prepareNotifications = async () => {
       // Set up standard notification handler
-      setupStandardNotifications();
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        }),
+      });
 
       // Request permissions if needed
       await NotificationService.requestNotificationPermissions();

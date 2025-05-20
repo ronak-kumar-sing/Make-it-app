@@ -2,12 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as BackgroundFetch from 'expo-background-fetch';
 import { StatusBar } from 'expo-status-bar';
+import * as TaskManager from 'expo-task-manager';
 import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { initializeAndroidNotifications } from './services/AndroidNotificationFixes';
+import { registerBackgroundNotificationHandler } from './services/BackgroundNotificationHandler';
+import { initializeNotifications } from './services/NotificationService';
+import { registerTimerBackgroundTask } from './services/TimerBackgroundTask';
 import { verifyDataIntegrity } from './utils/DataIntegrity';
 
 // Screens
@@ -184,6 +188,41 @@ function MainTabs() {
   );
 }
 
+// Initialize background tasks and notification channels
+async function initializeBackgroundTasks() {
+  try {
+    // Register the background notification handler task
+    await registerBackgroundNotificationHandler();
+    console.log('BackgroundNotificationHandler registration attempt in _layout.tsx');
+
+    if (Platform.OS === 'android') {
+      await initializeNotifications(true); // This likely sets up channels
+      await registerTimerBackgroundTask();
+
+      // Register the background fetch task if not already registered
+      // This specific registration for TIMER_BACKGROUND_TASK might be redundant if registerTimerBackgroundTask handles it robustly
+      // However, keeping it here for now as it was part of existing logic.
+      const isTimerTaskRegistered = await TaskManager.isTaskRegisteredAsync('TIMER_BACKGROUND_TASK');
+      if (!isTimerTaskRegistered) {
+        console.log('Attempting to register TIMER_BACKGROUND_TASK from _layout.tsx');
+        await BackgroundFetch.registerTaskAsync('TIMER_BACKGROUND_TASK', {
+          minimumInterval: 60, // 1 minute minimum interval
+          stopOnTerminate: false,
+          startOnBoot: true,
+        });
+      } else {
+        console.log('TIMER_BACKGROUND_TASK already registered, checked from _layout.tsx');
+      }
+    } else if (Platform.OS === 'ios') {
+      // iOS specific background task initialization if needed
+      await initializeNotifications(true); // Ensure channels/categories are set up on iOS too
+      await registerTimerBackgroundTask(); // Register timer task for iOS
+    }
+  } catch (error) {
+    console.error('Error initializing background tasks in _layout.tsx:', error);
+  }
+}
+
 export default function App() {
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
 
@@ -200,13 +239,11 @@ export default function App() {
           setIsFirstLaunch(false);
         }
 
+        // Initialize background tasks and notification channels
+        await initializeBackgroundTasks();
+
         // Then verify and fix any data integrity issues
         await verifyDataIntegrity();
-
-        // Set up Android notification channels if on Android
-        if (Platform.OS === 'android') {
-          await initializeAndroidNotifications();
-        }
       } catch (error) {
         console.error('Error initializing app:', error);
         setIsFirstLaunch(false); // Default to false if there's an error

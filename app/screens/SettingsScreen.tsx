@@ -753,9 +753,9 @@ const SettingsScreen = ({ navigation }) => {
                 </Text>
                 <View style={styles.sliderContainer}>
                   <Slider
-                    style={{ width: '100%', height: 40 }}
+                    style={{ width: '60%', height: 40 }} // Slider remains 60% width
                     minimumValue={1}
-                    maximumValue={60}
+                    maximumValue={30} // Assuming max 30 minutes based on your current code, adjust if needed
                     step={1}
                     value={taskReminderMinutes}
                     onValueChange={handleTaskReminderMinutesChange}
@@ -763,9 +763,15 @@ const SettingsScreen = ({ navigation }) => {
                     maximumTrackTintColor={theme.border}
                     thumbTintColor={theme.primary}
                   />
-                  <Text style={[styles.sliderValue, { color: theme.text }]}>
-                    {taskReminderMinutes} {taskReminderMinutes === 1 ? 'minute' : 'minutes'} before due
-                  </Text>
+                  {/* This View will now appear below the Slider */}
+                  <View style={styles.reminderTimeDisplay}>
+                    <View style={styles.reminderTimeIcon}>
+                      <Ionicons name="alarm-outline" size={16} color={theme.text} />
+                      <Text style={[styles.reminderTimeText, { color: theme.text }]}>
+                        {taskReminderMinutes} min
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </View>
             </>
@@ -1003,13 +1009,12 @@ const styles = StyleSheet.create({
     height: 40,
   },
   sliderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
+    flexDirection: 'column', // Changed from 'row'
+    alignItems: 'flex-start', // Align items to the start of the column
+    width: '100%', // Container takes full available width in settingItem
   },
   sliderValue: {
-    marginLeft: 8,
+    // marginLeft: 8, // Removed as it's no longer side-by-side
     fontSize: 14,
     fontWeight: 'bold',
     minWidth: 50,
@@ -1155,6 +1160,20 @@ const styles = StyleSheet.create({
   developerInfo: {
     fontSize: 16,
     marginBottom: 16,
+  },
+  reminderTimeDisplay: {
+    marginTop: 4, // Keeps some space from the slider
+    width: '100%', // Text container takes full width of sliderContainer
+    alignItems: 'flex-start', // Align content to the left
+  },
+  reminderTimeIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reminderTimeText: {
+    marginLeft: 4,
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 

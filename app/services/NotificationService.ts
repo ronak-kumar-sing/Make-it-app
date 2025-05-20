@@ -2,667 +2,435 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { registerBackgroundNotificationHandler } from './BackgroundNotificationHandler';
 import { isUsingExpoGo, showNotificationLimitationsWarning } from './NotificationWarning';
 
-// Import additional notification utilities
-export {
-    cancelNotificationsByType, scheduleDailyGoalReminder,
-    scheduleStreakReminder,
-    sendAchievementNotification
-} from './NotificationUtils';
-
-// Configure how notifications appear when the app is in the foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true, // Required for iOS 14+
-    shouldShowList: true, // Required for iOS 14+
-    priority: Notifications.AndroidNotificationPriority.HIGH,
-  }),
-});
-
-// Register for background notifications on app start
-const configurePushNotifications = async () => {
-  // For Android, set up notification channels
-  if (Platform.OS === 'android') {
-    console.log('Setting up Android notification channels');
-
-    try {
-      // Default channel for general notifications
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'Default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-
-      // Additional channels
-      await Notifications.setNotificationChannelAsync('tasks', {
-        name: 'Tasks',
-        description: 'Notifications for task due dates and reminders',
-        importance: Notifications.AndroidImportance.HIGH
-      });
-
-      await Notifications.setNotificationChannelAsync('timer', {
-        name: 'Timer',
-        description: 'Notifications for study timer sessions',
-        importance: Notifications.AndroidImportance.HIGH
-      });
-
-      await Notifications.setNotificationChannelAsync('exams', {
-        name: 'Exams',
-        description: 'Notifications for exam reminders',
-        importance: Notifications.AndroidImportance.HIGH
-      });
-
-      console.log('Android notification channels set up successfully');
-    } catch (error) {
-      console.error('Error setting up notification channels:', error);
-    }
-  }
+// Define notification types
+export const NOTIFICATION_TYPES = {
+  TASK_DUE: 'TASK_DUE',
+  TASK_REMINDER: 'TASK_REMINDER',
+  EXAM_REMINDER: 'EXAM_REMINDER',
+  TIMER_COMPLETED: 'TIMER_COMPLETED',
 };
-
-// Configure channels when the module loads
-(async () => {
-  try {
-    console.log('Setting up notification configuration on service load');
-    await configurePushNotifications();
-  } catch (error) {
-    console.error('Error during initial notification setup:', error);
-  }
-})();
 
 // Type definitions
 type Task = {
   id: string;
   title: string;
   dueDate: string;
-  dueTime?: string; // Added time field for tasks
   description?: string;
   subject?: string;
   completed?: boolean;
-  timerMinutes?: number; // Time set for this task
+  timerMinutes?: number;
 };
 
 type Exam = {
   id: string;
   title: string;
   date: string;
-  time?: string;
   description?: string;
   subject?: string;
   completed?: boolean;
 };
 
-// Notification types
-export const NOTIFICATION_TYPES = {
-  TASK_DUE: 'TASK_DUE',
-  TASK_REMINDER: 'TASK_REMINDER', // New type for early reminders
-  EXAM_REMINDER: 'EXAM_REMINDER',
-  TIMER_COMPLETED: 'TIMER_COMPLETED',
+// Type definitions for notifications
+export interface NotificationData extends Record<string, unknown> {
+  type: keyof typeof NOTIFICATION_TYPES;
+  taskId?: string;
+  examId?: string;
+  timerId?: string;
+  timeLeft?: number;
+}
+
+// Type for timer state
+interface TimerState {
+  timeLeft: number;
+  isPaused: boolean;
+  lastUpdated: number;
+}
+
+// Configure foreground notification handling
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    priority: Notifications.AndroidNotificationPriority.MAX,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
+// Utility function to create a time-based trigger
+const createTrigger = (date: Date): Notifications.NotificationTriggerInput => ({
+  type: 'timeInterval' as const,
+  seconds: Math.max(1, Math.floor((date.getTime() - Date.now()) / 1000)),
+  repeats: false,
+});
+
+// Initialize notification channels for Android
+const initializeAndroidChannels = async () => {
+  if (Platform.OS === 'android') {
+    await Promise.all([
+      Notifications.setNotificationChannelAsync('default', {
+        name: 'Default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+        enableLights: true,
+        enableVibrate: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        showBadge: true,
+      }),
+      Notifications.setNotificationChannelAsync('tasks', {
+        name: 'Tasks',
+        description: 'Task notifications and reminders',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        enableLights: true,
+        enableVibrate: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        showBadge: true,
+      }),
+      Notifications.setNotificationChannelAsync('exams', {
+        name: 'Exams',
+        description: 'Exam reminders',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        enableLights: true,
+        enableVibrate: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        showBadge: true,
+      }),
+      Notifications.setNotificationChannelAsync('timer', {
+        name: 'Timer',
+        description: 'Timer notifications',
+        importance: Notifications.AndroidImportance.HIGH,
+        enableLights: true,
+        enableVibrate: true,
+        vibrationPattern: [0, 500, 250, 500],
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        showBadge: true,
+      }),
+      Notifications.setNotificationChannelAsync('persistent', {
+        name: 'Persistent',
+        description: 'Ongoing notifications that stay visible',
+        importance: Notifications.AndroidImportance.HIGH,
+        enableLights: false,
+        enableVibrate: false,
+        showBadge: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      }),
+    ]);
+  }
 };
 
-// Check if device can receive notifications
+// Check if device supports notifications
 export const areNotificationsAvailable = async () => {
   if (!Device.isDevice) {
-    return false; // Cannot show notifications on simulator/emulator
+    return false;
   }
-
-  // Show a warning if in Expo Go (only once per app launch)
   if (isUsingExpoGo() && Platform.OS === 'android') {
     showNotificationLimitationsWarning();
   }
-
   return true;
 };
 
-// Check notification permissions
-export const checkPermissions = async () => {
-  try {
-    const { status } = await Notifications.getPermissionsAsync();
-    return { status };
-  } catch (err) {
-    console.error('Error checking notification permissions:', err);
-    return { status: 'denied', error: err };
-  }
-};
-
-// Request permission for notifications
+// Request notification permissions
 export const requestNotificationPermissions = async () => {
-  // Check if we're on a real device
-  if (!Device.isDevice) {
-    return false;
-  }
+  if (!Device.isDevice) return false;
 
-  // Check if we've requested permissions recently
   try {
-    const lastRequest = await AsyncStorage.getItem('lastPermissionRequest');
-    const now = new Date().getTime();
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
 
-    // If we requested within the last 24 hours and were denied, don't ask again
-    if (lastRequest) {
-      const timeSinceLastRequest = now - parseInt(lastRequest);
-
-      // Check current status without prompting
-      const { status } = await Notifications.getPermissionsAsync();
-
-      // If permission was denied within last 24 hours, don't prompt again
-      if (status !== 'granted' && timeSinceLastRequest < 86400000) {
-        console.log('Skipping permission request - asked recently');
-        return false;
-      }
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      await AsyncStorage.setItem('lastPermissionRequest', Date.now().toString());
+      return status === 'granted';
     }
+
+    return true;
   } catch (error) {
-    console.error('Error checking last permission request time', error);
-  }
-
-  console.log('Requesting notification permissions...');
-
-  // Check existing status
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  console.log('Current notification permission status:', existingStatus);
-
-  // If already granted, we're good
-  let finalStatus = existingStatus;
-  if (existingStatus !== 'granted') {
-    // Request permissions - this will trigger the appropriate permission dialog
-    // On Android 13+ it will request the POST_NOTIFICATIONS permission
-    console.log('Requesting notification permission from OS');
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-    console.log('After request, notification permission status:', status);
-
-    // Store when we last requested
-    try {
-      await AsyncStorage.setItem('lastPermissionRequest', new Date().getTime().toString());
-    } catch (error) {
-      console.error('Error storing permission request time', error);
-    }
-  }
-
-  if (finalStatus !== 'granted') {
+    console.error('Error requesting notification permissions:', error);
     return false;
   }
-
-  // Set up notification channels for Android
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-      enableLights: true,
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    });
-
-    // Create channels for different notification types
-    await Notifications.setNotificationChannelAsync('tasks', {
-      name: 'Tasks',
-      description: 'Notifications for task due dates',
-      importance: Notifications.AndroidImportance.HIGH,
-      enableVibrate: true,
-      vibrationPattern: [0, 250, 250, 250],
-      enableLights: true,
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    });
-
-    await Notifications.setNotificationChannelAsync('exams', {
-      name: 'Exams',
-      description: 'Notifications for exam reminders',
-      importance: Notifications.AndroidImportance.HIGH,
-      enableVibrate: true,
-      vibrationPattern: [0, 250, 250, 250],
-      enableLights: true,
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    });
-
-    await Notifications.setNotificationChannelAsync('timer', {
-      name: 'Timer',
-      description: 'Notifications for timer sessions',
-      importance: Notifications.AndroidImportance.HIGH,
-      enableVibrate: true,
-      vibrationPattern: [0, 250, 250, 250],
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    });
-  }
-
-  return true;
 };
 
-// Backward compatibility function for older components
-export const requestPermissionsAsync = async () => {
-  const result = await requestNotificationPermissions();
-  return { status: result ? 'granted' : 'denied' };
-};
-
-// Helper function to get task date and time as a Date object
-const getTaskDateTime = (task: Task): Date => {
-  const dueDate = new Date(task.dueDate);
-
-  // If there's a time set, use it
-  if (task.dueTime) {
-    const [hours, minutes] = task.dueTime.split(':').map(Number);
-    dueDate.setHours(hours, minutes, 0, 0);
-  } else {
-    // Default to end of day if no specific time
-    dueDate.setHours(23, 59, 0, 0);
-  }
-
-  return dueDate;
-};
-
-// Schedule a task due notification with early reminder
-export const scheduleTaskDueNotification = async (task: Task, reminderMinutes: number = 5) => {
+// Schedule a task notification
+export const scheduleTaskNotification = async (task: Task, reminderMinutes: number = 5) => {
   if (!task.dueDate) return null;
 
   try {
-    const { status } = await checkPermissions();
-    if (status !== 'granted') return null;
+    const dueDate = new Date(task.dueDate);
+    if (dueDate <= new Date()) return null;
 
-    const dueDateTime = getTaskDateTime(task);
-
-    // Don't schedule if the date is in the past
-    if (dueDateTime < new Date()) return null;
-
-    // Cancel any existing notifications for this task
     await cancelTaskNotification(task.id);
 
     const notificationIds = [];
 
-    // If there's a specific time and we should send an early reminder
-    if (task.dueTime && reminderMinutes > 0) {
-      // Calculate reminder time
-      const reminderTime = new Date(dueDateTime);
+    // Schedule reminder notification
+    if (reminderMinutes > 0) {
+      const reminderTime = new Date(dueDate);
       reminderTime.setMinutes(reminderTime.getMinutes() - reminderMinutes);
 
-      // Only schedule if the reminder time is in the future
       if (reminderTime > new Date()) {
-        // Schedule early reminder notification
-        const reminderNotificationId = await Notifications.scheduleNotificationAsync({
+        const reminderId = await Notifications.scheduleNotificationAsync({
           content: {
             title: `Reminder: ${task.title}`,
-            body: `Your task is due in ${reminderMinutes} minutes.`,
+            body: `Task due in ${reminderMinutes} minutes`,
             data: {
               type: NOTIFICATION_TYPES.TASK_REMINDER,
               taskId: task.id,
             },
-            priority: 'high',
-            sound: true
-          },      trigger: {
-        date: reminderTime,
-        channelId: Platform.OS === 'android' ? 'tasks' : undefined,
-        type: 'date',
-      },
+            sound: true,
+          },
+          trigger: createTrigger(reminderTime),
         });
 
-        notificationIds.push({
-          id: reminderNotificationId,
-          type: 'reminder',
-          scheduledFor: reminderTime.toISOString()
-        });
-
-        console.log(`Task reminder scheduled for "${task.title}" at ${reminderTime.toLocaleString()}`);
+        notificationIds.push({ id: reminderId, type: 'reminder' });
       }
     }
 
-    // Schedule notification for task due time
-    const mainNotificationId = await Notifications.scheduleNotificationAsync({
+    // Schedule due notification
+    const dueId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Task Due Now',
-        body: `"${task.title}" is due now.`,
+        title: 'Task Due',
+        body: `${task.title} is due now`,
         data: {
           type: NOTIFICATION_TYPES.TASK_DUE,
           taskId: task.id,
-          timerMinutes: task.timerMinutes
         },
-        priority: 'high',
-        sound: true
+        sound: true,
       },
-      trigger: {
-        date: dueDateTime,
-        type: 'date',
-        channelId: Platform.OS === 'android' ? 'tasks' : undefined,
-      },
+      trigger: createTrigger(dueDate),
     });
 
-    notificationIds.push({
-      id: mainNotificationId,
-      type: 'main',
-      scheduledFor: dueDateTime.toISOString()
-    });
-
-    // Store notification IDs for future reference
+    notificationIds.push({ id: dueId, type: 'due' });
     await AsyncStorage.setItem(`taskNotification:${task.id}`, JSON.stringify(notificationIds));
 
-    console.log(`Task notification scheduled for "${task.title}" at ${dueDateTime.toLocaleString()}`);
     return notificationIds;
-  } catch (err) {
-    console.error('Error scheduling task notification:', err);
+  } catch (error) {
+    console.error('Error scheduling task notification:', error);
     return null;
   }
 };
 
-// Cancel a task notification
-export const cancelTaskNotification = async (taskId: string) => {
-  try {
-    const storedNotifications = await AsyncStorage.getItem(`taskNotification:${taskId}`);
-    if (storedNotifications) {
-      const notifications = JSON.parse(storedNotifications);
-      if (Array.isArray(notifications)) {
-        for (const notification of notifications) {
-          await Notifications.cancelScheduledNotificationAsync(notification.id);
-        }
-      } else if (notifications.id) {
-        // Legacy format support
-        await Notifications.cancelScheduledNotificationAsync(notifications.id);
-      }
-      await AsyncStorage.removeItem(`taskNotification:${taskId}`);
-    }
-
-    // Also check for all scheduled notifications and cancel any with this taskId
-    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-    const taskNotifications = scheduledNotifications.filter(
-      notification => notification.content.data?.taskId === taskId
-    );
-
-    for (const notification of taskNotifications) {
-      await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-    }
-  } catch (err) {
-    console.error('Error canceling task notification:', err);
-  }
-};
-
-// Schedule an exam reminder notification for 5 AM
+// Schedule exam reminder
 export const scheduleExamReminder = async (exam: Exam) => {
   if (!exam.date) return null;
 
   try {
-    const { status } = await checkPermissions();
-    if (status !== 'granted') return null;
-
     const examDate = new Date(exam.date);
+    if (examDate <= new Date()) return null;
 
-    // Don't schedule if the date is in the past
-    if (examDate < new Date()) return null;
+    await cancelExamReminder(exam.id);
 
-    // Cancel any existing notifications for this exam
-    await cancelExamReminders(exam.id);
+    const morningTime = new Date(examDate);
+    morningTime.setHours(5, 0, 0, 0);
 
-    // Schedule notification for 5 AM on the exam day
-    const examDayMorning = new Date(examDate);
-    examDayMorning.setHours(5, 0, 0); // 5 AM on exam day
+    if (morningTime <= new Date()) return null;
 
-    if (examDayMorning > new Date()) {
-      // Configure notification for high priority
-      const morningId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Exam Today',
-          body: `Your "${exam.title}" exam is today.`,
-          data: {
-            type: NOTIFICATION_TYPES.EXAM_REMINDER,
-            examId: exam.id
-          },
-          sound: true,
-          priority: 'high',
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Exam Today',
+        body: `${exam.title} exam is today`,
+        data: {
+          type: NOTIFICATION_TYPES.EXAM_REMINDER,
+          examId: exam.id,
         },
-        trigger: {
-          date: examDayMorning,
-          channelId: Platform.OS === 'android' ? 'exams' : undefined,
-        },
-      });
+        sound: true,
+      },
+      trigger: createTrigger(morningTime),
+    });
 
-      // Store the notification ID
-      await AsyncStorage.setItem(`examNotification:${exam.id}`, JSON.stringify([
-        { id: morningId, type: 'morning' }
-      ]));
-
-      console.log(`Exam notification scheduled for ${exam.title} at ${examDayMorning.toLocaleString()}`);
-      return [{ id: morningId, type: 'morning' }];
-    }
-
-    return null;
-  } catch (err) {
-    console.error('Error scheduling exam notification:', err);
+    await AsyncStorage.setItem(`examNotification:${exam.id}`, JSON.stringify([{ id: notificationId }]));
+    return [{ id: notificationId }];
+  } catch (error) {
+    console.error('Error scheduling exam reminder:', error);
     return null;
   }
 };
 
-// Cancel exam notifications
-export const cancelExamReminders = async (examId: string) => {
+// Schedule a persistent timer notification
+export const schedulePersistentTimerNotification = async (
+  timeLeft: number,
+  title: string = 'Timer Running',
+  timerId: string,
+  isPaused: boolean = false
+) => {
   try {
-    const storedNotifications = await AsyncStorage.getItem(`examNotification:${examId}`);
-    if (storedNotifications) {
-      const notifications = JSON.parse(storedNotifications);
-      for (const notification of notifications) {
-        await Notifications.cancelScheduledNotificationAsync(notification.id);
-      }
+    const notificationId = `timer-${timerId}`;
+
+    // Store timer state
+    const timerState: TimerState = {
+      timeLeft,
+      isPaused,
+      lastUpdated: Date.now()
+    };
+    await AsyncStorage.setItem(`timerState:${timerId}`, JSON.stringify(timerState));
+
+    // For Android, ensure we're using the persistent channel
+    const androidConfig = Platform.OS === 'android' ? {
+      channelId: 'persistent',
+    } : undefined;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body: isPaused ?
+          'Timer is paused. Open app to resume.' :
+          `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')} remaining`,
+        data: {
+          type: NOTIFICATION_TYPES.TIMER_COMPLETED,
+          timerId,
+          timeLeft
+        } as NotificationData,
+        sound: false,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        ...androidConfig,
+      },
+      trigger: null,
+      identifier: notificationId
+    });
+
+    return notificationId;
+  } catch (error) {
+    console.error('Error scheduling persistent timer notification:', error);
+    return null;
+  }
+};
+
+// Update or remove persistent timer notification
+export const updatePersistentTimerNotification = async (
+  timerId: string,
+  timeLeft?: number,
+  isPaused?: boolean
+) => {
+  try {
+    const notificationId = `timer-${timerId}`;
+    if (timeLeft === undefined) {
+      // Remove the notification
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
+      await AsyncStorage.removeItem(`timerState:${timerId}`);
+    } else {
+      // Update the notification
+      await schedulePersistentTimerNotification(timeLeft, undefined, timerId, isPaused);
+    }
+  } catch (error) {
+    console.error('Error updating persistent timer notification:', error);
+  }
+};
+
+// Cancel notifications
+export const cancelTaskNotification = async (taskId: string) => {
+  try {
+    const stored = await AsyncStorage.getItem(`taskNotification:${taskId}`);
+    if (stored) {
+      const notifications = JSON.parse(stored);
+      await Promise.all(
+        notifications.map((n: { id: string }) =>
+          Notifications.cancelScheduledNotificationAsync(n.id)
+        )
+      );
+      await AsyncStorage.removeItem(`taskNotification:${taskId}`);
+    }
+  } catch (error) {
+    console.error('Error canceling task notification:', error);
+  }
+};
+
+export const cancelExamReminder = async (examId: string) => {
+  try {
+    const stored = await AsyncStorage.getItem(`examNotification:${examId}`);
+    if (stored) {
+      const notifications = JSON.parse(stored);
+      await Promise.all(
+        notifications.map((n: { id: string }) =>
+          Notifications.cancelScheduledNotificationAsync(n.id)
+        )
+      );
       await AsyncStorage.removeItem(`examNotification:${examId}`);
     }
-
-    // Also check for all scheduled notifications and cancel any with this examId
-    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-    const examNotifications = scheduledNotifications.filter(
-      notification => notification.content.data?.examId === examId
-    );
-
-    for (const notification of examNotifications) {
-      await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-    }
-  } catch (err) {
-    console.error('Error canceling exam notifications:', err);
+  } catch (error) {
+    console.error('Error canceling exam reminder:', error);
   }
 };
 
-// Send an immediate notification when timer completes
-export const sendTimerCompletionNotification = async (title = 'Timer Complete', body = 'Your study session is complete.') => {
+// Send immediate notifications
+export const sendTimerCompletionNotification = async (title = 'Timer Complete', body = 'Study session complete') => {
   try {
-    const { status } = await checkPermissions();
-    if (status !== 'granted') return;
-
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
         body,
         data: { type: NOTIFICATION_TYPES.TIMER_COMPLETED },
-        priority: 'high',
-        sound: true
+        sound: true,
       },
-      trigger: null, // Immediate notification
+      trigger: null,
     });
-  } catch (err) {
-    console.error('Error sending timer completion notification:', err);
-  }
-};
-
-// Cancel all scheduled notifications
-export const cancelAllNotifications = async () => {
-  try {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-
-    // Clear all stored notification IDs
-    const keys = await AsyncStorage.getAllKeys();
-    const notificationKeys = keys.filter(key =>
-      key.startsWith('taskNotification:') ||
-      key.startsWith('examNotification:')
-    );
-
-    if (notificationKeys.length > 0) {
-      await AsyncStorage.multiRemove(notificationKeys);
-    }
-  } catch (err) {
-    console.error('Error canceling all notifications:', err);
-  }
-};
-
-// For Expo Push Notifications service (not used for local notifications)
-export const registerForPushNotificationsAsync = async () => {
-  console.log("Push notifications feature would need Expo push token setup");
-};
-
-// Add a listener for notification responses
-export const addNotificationResponseReceivedListener = (callback: (response: Notifications.NotificationResponse) => void) => {
-  return Notifications.addNotificationResponseReceivedListener(callback);
-};
-
-// Check if specific notification type is enabled
-export const isNotificationTypeEnabled = async (type: string) => {
-  try {
-    const settings = await AsyncStorage.getItem('notification_settings');
-    if (!settings) return true; // Default to enabled if no settings
-
-    const parsedSettings = JSON.parse(settings);
-
-    switch (type) {
-      case NOTIFICATION_TYPES.TASK_DUE:
-        return parsedSettings.tasksDue !== false;
-      case NOTIFICATION_TYPES.EXAM_REMINDER:
-        return parsedSettings.exams !== false;
-      case NOTIFICATION_TYPES.TIMER_COMPLETED:
-        return parsedSettings.timerCompleted !== false;
-      default:
-        return true;
-    }
   } catch (error) {
-    console.error('Error checking notification type settings:', error);
-    return true; // Default to enabled on error
+    console.error('Error sending timer completion notification:', error);
   }
 };
 
 // Initialize notifications system
 export const initializeNotifications = async (
-  notificationsEnabled: boolean,
+  enabled: boolean,
   tasks: Task[] = [],
   exams: Exam[] = [],
-  taskReminderMinutes: number = 5
+  reminderMinutes: number = 5
 ) => {
-  // If notifications are not enabled in settings, don't schedule any
-  if (!notificationsEnabled) return;
+  if (!enabled) return;
 
   try {
-    // Check permissions without showing a dialog on every initialization
-    const { status } = await checkPermissions();
+    // Initialize Android channels
+    await initializeAndroidChannels();
 
-    if (status !== 'granted') {
-      // Only try to request permissions if we haven't recently done so
-      const lastRequest = await AsyncStorage.getItem('lastPermissionRequest');
-      const now = new Date().getTime();
+    // Check permissions
+    if (!await requestNotificationPermissions()) return;
 
-      if (!lastRequest || (now - parseInt(lastRequest)) > 86400000) {
-        const permissionGranted = await requestNotificationPermissions();
-        if (!permissionGranted) return;
-      } else {
-        // Skip if we've recently asked for permissions
-        return;
-      }
-    }
+    // Initialize background handlers
+    await registerBackgroundNotificationHandler();
 
-    // Schedule notifications for upcoming tasks with due dates
-    if (tasks.length > 0) {
-      tasks.forEach(task => {
-        if (!task.completed && task.dueDate) {
-          scheduleTaskDueNotification(task, taskReminderMinutes);
-        }
-      });
-    }
+    // Schedule notifications
+    const promises = [
+      ...tasks
+        .filter(t => !t.completed && t.dueDate)
+        .map(t => scheduleTaskNotification(t, reminderMinutes)),
+      ...exams
+        .filter(e => !e.completed && e.date)
+        .map(e => scheduleExamReminder(e)),
+    ];
 
-    // Schedule notifications for upcoming exams
-    if (exams.length > 0) {
-      exams.forEach(exam => {
-        if (!exam.completed && exam.date) {
-          scheduleExamReminder(exam);
-        }
-      });
+    await Promise.all(promises);
+
+    // Restore any active timer notifications
+    const keys = await AsyncStorage.getAllKeys();
+    const timerKeys = keys.filter(key => key.startsWith('timerState:'));
+
+    for (const key of timerKeys) {
+      const timerStateStr = await AsyncStorage.getItem(key);
+      if (!timerStateStr) continue;
+
+      const timerState = JSON.parse(timerStateStr);
+      const timerId = key.replace('timerState:', '');
+      await schedulePersistentTimerNotification(
+        timerState.timeLeft,
+        'Timer Running',
+        timerId,
+        timerState.isPaused
+      );
     }
   } catch (error) {
     console.error('Error initializing notifications:', error);
   }
 };
 
-// Create or update a persistent timer notification that shows in the notification bar
-export const showTimerNotification = async (
-  timeLeft: number,
-  timerMode: string,
-  isRunning: boolean,
-  taskTitle?: string
-) => {
-  try {
-    const { status } = await checkPermissions();
-    if (status !== 'granted') return;
-
-    // Format time for display (MM:SS)
-    const minutes = Math.floor(timeLeft / 60);
-    const seconds = timeLeft % 60;
-    const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-    // Determine notification title and body based on timer mode
-    const modeDisplay = timerMode === 'pomodoro' ? 'Focus Session' :
-                        timerMode === 'shortBreak' ? 'Short Break' : 'Long Break';
-
-    const title = `${modeDisplay}: ${formattedTime}`;
-    const body = isRunning
-      ? `${taskTitle ? `Working on: ${taskTitle}` : 'Timer running'}`
-      : 'Timer paused';
-
-    // We use a fixed ID for the timer notification so we can update it
-    const notificationId = 'timer-notification';
-
-    // On Android, we need to create a foreground service notification for background operation
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('timer', {
-        name: 'Timer',
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 0, 0, 0], // No vibration
-        sound: false, // No sound on updates
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        enableVibrate: false,
-      });
-
-      // For Android, we use the presentationOptions to ensure the notification stays visible
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          data: { type: 'TIMER_RUNNING', notificationId },
-          sticky: true, // Make it persistent
-          autoDismiss: false, // Prevent auto-dismissal
-          priority: 'high',
-          // Channel ID for Android
-          channelId: 'timer'
-          // Note: android-specific options like 'ongoing' are now configured via channels
-        },
-        trigger: null, // Send immediately
-        identifier: notificationId, // Fixed ID so we can update it
-      });
-    } else {
-      // For iOS, the approach is simpler
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          data: { type: 'TIMER_RUNNING', notificationId },
-          sticky: true,
-          autoDismiss: false,
-        },
-        trigger: null,
-        identifier: notificationId,
-      });
-    }
-  } catch (err) {
-    console.error('Error showing timer notification:', err);
-  }
+export default {
+  initializeNotifications,
+  scheduleTaskNotification,
+  scheduleExamReminder,
+  sendTimerCompletionNotification,
+  schedulePersistentTimerNotification,
+  updatePersistentTimerNotification,
 };
-
-// Cancel the persistent timer notification
-export const cancelTimerNotification = async () => {
-  try {
-    await Notifications.cancelScheduledNotificationAsync('timer-notification');
-  } catch (err) {
-    console.error('Error canceling timer notification:', err);
-  }
-};
-
-// Added default export to satisfy React Navigation
-export default {};

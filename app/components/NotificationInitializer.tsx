@@ -51,16 +51,15 @@ export default function NotificationInitializer() {
         console.log('Checking notification permissions during app initialization');
 
         // Check if we already have permissions before showing the dialog
-        const { status } = await NotificationService.checkPermissions();
-        console.log('Current notification permission status:', status);
+        const permissionGranted = await NotificationService.requestNotificationPermissions();
+        console.log('Notification permission request result:', permissionGranted);
 
-        // If permission not granted, request it
-        if (status !== 'granted') {
-          console.log('Requesting notification permissions during initialization');
-          await NotificationService.requestNotificationPermissions();
+        if (permissionGranted) {
+          console.log('Notification permissions granted');
           await AsyncStorage.setItem('lastPermissionRequest', now.toString());
         } else {
-          console.log('Notification permissions already granted');
+          console.log('Notification permissions not granted');
+          return;
         }
       } else {
         console.log('Skipping permission request - asked recently');
