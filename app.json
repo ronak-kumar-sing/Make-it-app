@@ -74,7 +74,14 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
+      "router": {
+        "unstable_settings": {
+          "ignore": [
+            "./services/**",
+            "./utils/**"
+          ]
+        }
+      },
       "eas": {
         "projectId": "0db421b5-de1b-46df-bb9b-ffd9c1838372"
       }

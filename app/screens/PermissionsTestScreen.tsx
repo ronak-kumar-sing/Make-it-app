@@ -12,7 +12,7 @@ import {
   View
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import * as PermissionsManager from '../services/PermissionsManager';
+import * as PermissionsManager from '../../src/services/PermissionsManager';
 
 export default function PermissionsTestScreen({ navigation }) {
   const { theme } = useTheme();

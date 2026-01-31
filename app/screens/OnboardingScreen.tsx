@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -19,6 +19,7 @@ const OnboardingScreen = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const navigation = useNavigation();
   const { theme } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
 
   const onboardingData = [
     {
@@ -78,7 +79,7 @@ const OnboardingScreen = () => {
           setCurrentPage(newPage);
         }}
         scrollEnabled={false}
-        ref={(ref) => (this.scrollRef = ref)}
+        ref={scrollRef}
       >
         {onboardingData.map((page, index) => (
           <View key={index} style={[styles.page, { backgroundColor: theme.background }]}>

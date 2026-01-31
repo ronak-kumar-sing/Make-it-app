@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useContext, useEffect, useRef } from 'react';
 import { AppContext } from '../context/AppContext';
-import * as NotificationService from '../services/NotificationService';
+import * as NotificationService from '../../src/services/NotificationService';
 
 /**
  * Component that handles notification initialization and permission requests

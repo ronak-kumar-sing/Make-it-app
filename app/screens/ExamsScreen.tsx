@@ -6,7 +6,7 @@ import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, Toucha
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppContext } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
-import * as NotificationService from '../services/NotificationService';
+import * as NotificationService from '../../src/services/NotificationService';
 
 // Define types
 interface Exam {

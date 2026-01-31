@@ -2,8 +2,8 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { isUsingExpoGo } from '../services/NotificationWarning';
-import { showInAppAlert } from '../utils/SimpleNotificationHelper';
+import { isUsingExpoGo } from '../../src/services/NotificationWarning';
+import { showInAppAlert } from '../../src/utils/SimpleNotificationHelper';
 
 interface SimpleNotificationExampleProps {
   theme: any;

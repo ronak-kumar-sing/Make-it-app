@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import * as NotificationService from '../services/NotificationService';
-import { hasFullNotificationSupport, isUsingExpoGo } from '../services/NotificationWarning';
+import * as NotificationService from '../../src/services/NotificationService';
+import { hasFullNotificationSupport, isUsingExpoGo } from '../../src/services/NotificationWarning';
 
 interface NotificationDialogProps {
   visible: boolean;

@@ -1,9 +1,9 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 import { AppContext } from '../context/AppContext';
-import * as ArchiveService from '../services/ArchiveService';
-import { registerAutoArchiveTask, unregisterAutoArchiveTask } from '../services/BackgroundTaskManager';
-import * as PermissionsManager from '../services/PermissionsManager';
+import * as ArchiveService from '../../src/services/ArchiveService';
+import { registerAutoArchiveTask, unregisterAutoArchiveTask } from '../../src/services/BackgroundTaskManager';
+import * as PermissionsManager from '../../src/services/PermissionsManager';
 
 /**
  * Component that handles automatic archiving setup for tasks

@@ -6,7 +6,7 @@ import {
   hasRequestedPermissions,
   PermissionStatuses,
   requestAllPermissions
-} from '../services/PermissionsManager';
+} from '../../src/services/PermissionsManager';
 
 interface PermissionsInitializerProps {
   onPermissionsInitialized?: (statuses: PermissionStatuses) => void;

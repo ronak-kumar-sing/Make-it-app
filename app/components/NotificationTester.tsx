@@ -2,7 +2,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { isUsingExpoGo } from '../services/NotificationWarning';
+import { isUsingExpoGo } from '../../src/services/NotificationWarning';
 
 interface NotificationTesterProps {
   theme: any;

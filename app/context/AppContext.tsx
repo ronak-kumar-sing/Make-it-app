@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { differenceInDays, format } from 'date-fns';
 import React, { createContext, useCallback, useEffect, useMemo, useReducer } from 'react';
 import { Alert, AppState as RNAppState } from 'react-native';
-import * as NotificationService from '../services/NotificationService';
-import { syncSettingsToStorage } from '../utils/StorageSync';
+import * as NotificationService from '../../src/services/NotificationService';
+import { syncSettingsToStorage } from '../../src/utils/StorageSync';
 
 // Define types
 type Task = {
@@ -892,7 +892,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       // Import the storage utility functions at the top of the file - this will be needed!
-      const { addTimerSession } = require('../utils/StorageSync');
+      const { addTimerSession } = require('../../src/utils/StorageSync');
 
       // Execute the AsyncStorage save using the utility function
       addTimerSession(validSessionData).catch((error: Error) =>
@@ -1404,5 +1404,4 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
-export { AppContext };
 export default AppProvider;

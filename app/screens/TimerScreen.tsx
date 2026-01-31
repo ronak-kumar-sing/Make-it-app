@@ -13,9 +13,9 @@ import {
   initializeTimerState,
   registerTimerBackgroundTask,
   unregisterTimerBackgroundTask
-} from '../services/TimerBackgroundTask';
+} from '../../src/services/TimerBackgroundTask';
 // Corrected import path
-import { cancelTimerNotification, sendTimerCompletionNotification, showTimerNotification } from '../services/NotificationService';
+import { cancelTimerNotification, sendTimerCompletionNotification, showTimerNotification } from '../../src/services/NotificationService';
 
 const formatTime = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
@@ -496,6 +496,43 @@ const TimerScreen = () => {
       })();
     };
   }, [isRunning]); // Depend on isRunning
+
+  // Calculate progress as a percentage (0 to 1) for the progress ring
+  const calculateProgress = () => {
+    let totalTime = 0;
+    switch (timerMode) {
+      case 'pomodoro':
+        totalTime = settings.pomodoroLength * 60;
+        break;
+      case 'shortBreak':
+        totalTime = settings.shortBreakLength * 60;
+        break;
+      case 'longBreak':
+        totalTime = settings.longBreakLength * 60;
+        break;
+    }
+    if (totalTime === 0) return 0;
+    return (totalTime - timeLeft) / totalTime;
+  };
+
+  // Get the color for the timer based on the current mode
+  const getTimerColor = () => {
+    switch (timerMode) {
+      case 'pomodoro':
+        return theme.primary;
+      case 'shortBreak':
+        return theme.success || '#4CAF50';
+      case 'longBreak':
+        return theme.warning || '#FF9800';
+      default:
+        return theme.primary;
+    }
+  };
+
+  // Open task selection modal
+  const openTaskSelection = () => {
+    setShowTaskSelection(true);
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>

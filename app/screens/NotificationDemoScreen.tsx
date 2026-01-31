@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import NotificationTester from '../components/NotificationTester';
 import { useTheme } from '../context/ThemeContext';
-import * as NotificationService from '../services/NotificationService';
+import * as NotificationService from '../../src/services/NotificationService';
 
 export default function NotificationDemoScreen() {
   const { theme } = useTheme();

@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 // Import the resilient model directly
-import { resilientModel } from '../services/ResilientModelService.js';
+import { resilientModel } from '../../src/services/ResilientModelService.js';
 
 // Temporary solution: Define the necessary functions locally
 // These functions are copied from GeminiService.js to avoid import issues

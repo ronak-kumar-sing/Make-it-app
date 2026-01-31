@@ -4,14 +4,10 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { isUsingExpoGo, showNotificationLimitationsWarning } from './NotificationWarning';
 import { registerBackgroundNotificationHandler } from './BackgroundNotificationHandler';
+import { NOTIFICATION_TYPES } from './NotificationTypes';
 
-// Define notification types
-export const NOTIFICATION_TYPES = {
-  TASK_DUE: 'TASK_DUE',
-  TASK_REMINDER: 'TASK_REMINDER',
-  EXAM_REMINDER: 'EXAM_REMINDER',
-  TIMER_COMPLETED: 'TIMER_COMPLETED',
-};
+// Re-export NOTIFICATION_TYPES for backward compatibility
+export { NOTIFICATION_TYPES };
 
 // Type definitions
 type Task = {

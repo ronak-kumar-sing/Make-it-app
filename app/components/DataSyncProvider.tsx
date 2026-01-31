@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
 import React, { useContext, useEffect } from 'react';
 import { AppContext } from '../context/AppContext';
-import { syncStatsToStorage } from '../utils/StorageSync';
+import { syncStatsToStorage } from '../../src/utils/StorageSync';
 
 /**
  * Component to ensure proper data sync between context and AsyncStorage

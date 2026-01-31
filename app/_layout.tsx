@@ -9,10 +9,10 @@ import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { registerBackgroundNotificationHandler } from './services/BackgroundNotificationHandler';
-import { initializeNotifications } from './services/NotificationService';
-import { registerTimerBackgroundTask } from './services/TimerBackgroundTask';
-import { verifyDataIntegrity } from './utils/DataIntegrity';
+import { registerBackgroundNotificationHandler } from '../src/services/BackgroundNotificationHandler';
+import { initializeNotifications } from '../src/services/NotificationService';
+import { registerTimerBackgroundTask } from '../src/services/TimerBackgroundTask';
+import { verifyDataIntegrity } from '../src/utils/DataIntegrity';
 
 // Screens
 import AchievementsScreen from './screens/AchievementsScreen';
@@ -20,6 +20,7 @@ import AddTaskScreen from './screens/AddTaskScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ExamsScreen from './screens/ExamsScreen';
+import HomeScreen from './screens/HomeScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import PermissionsTestScreen from './screens/PermissionsTestScreen';
 import ResourcesScreen from './screens/ResourcesScreen';
@@ -91,7 +92,7 @@ function DashboardStack() {
     >
       <Stack.Screen
         name="DashboardMain"
-        component={DashboardScreen}
+        component={HomeScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

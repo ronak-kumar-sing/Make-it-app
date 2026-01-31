@@ -9,9 +9,9 @@ import NotificationPermissionDialog from '../components/NotificationPermissionDi
 import NotificationSettingsModal from '../components/NotificationSettingsModal';
 import { AppContext } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
-import * as NotificationService from '../services/NotificationService';
-import { verifyDataIntegrity } from '../utils/DataIntegrity';
-import { forceSyncAllData } from '../utils/StorageSync';
+import * as NotificationService from '../../src/services/NotificationService';
+import { verifyDataIntegrity } from '../../src/utils/DataIntegrity';
+import { forceSyncAllData } from '../../src/utils/StorageSync';
 
 const SettingsScreen = ({ navigation }) => {
   const {
